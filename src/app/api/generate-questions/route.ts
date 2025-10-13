@@ -19,10 +19,7 @@ interface Question {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        console.log('📥 Received body:', body); // DEBUG
-        const { notes, numberOfQuestions = 10 } = body;
-        console.log('📝 Extracted notes:', notes); // DEBUG
-        console.log('🔢 Number of questions:', numberOfQuestions); // DEBUG
+        const { notes, numberOfQuestions = 50 } = body;
 
         // Validate input
         if (!notes || notes.trim().length === 0) {

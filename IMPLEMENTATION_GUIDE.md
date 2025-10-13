@@ -36,6 +36,25 @@ npm install react-hot-toast
 npm install jspdf jspdf-autotable   # NEW - for PDF generation
 npm install html2canvas              # NEW - optional, for advanced PDF layouts
 ```
+## 1. Landing page UI component Structure (v1)
+```
+┌─────────────────────────────────────┐
+│  🎓 AI Study Buddy                  │  ← Header
+├─────────────────────────────────────┤
+│  Your Study Notes                   │  ← Label
+│  ┌─────────────────────────────┐   │
+│  │ [Textarea for notes]         │   │  ← Input
+│  └─────────────────────────────┘   │
+│                                     │
+│  Number of Questions: [5]           │  ← Number input
+│                                     │
+│  [✨ Generate Questions]            │  ← Button
+├─────────────────────────────────────┤
+│  ❌ Error message (if error)        │  ← Conditional
+│  🔄 Loading... (if loading)         │  ← Conditional
+│  📝 Questions list (if questions)   │  ← Conditional
+└─────────────────────────────────────┘
+```
 
 ## 2. Environment Variables (.env.local)
 
