@@ -1,12 +1,18 @@
+import { useState} from 'react';
 interface QuestionCardProps {
     question: string;
     options: string[];
     correctAnswer: string;
     explanation: string;
     questionNumber: number;
+    onAnswerRevealed: (isCorrect: boolean) => void;
 }
 
 const QuestionCard = (props: QuestionCardProps) => {
+
+    const [showAnswer, setShowAnswer] = useState(false);
+    const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
     return (
         <div className="bg-gray-800 rounded-lg shadow-lg p-6">
             {/* Question Number badge */}
@@ -24,13 +30,23 @@ const QuestionCard = (props: QuestionCardProps) => {
                 {props.options.map((option, i) => (
                     <div
                         key={i}
-                        className={`p-3 rounded-lg border ${option.startsWith(props.correctAnswer)
-                                ? 'bg-green-900/30 border-green-500 text-green-200'
+                        onClick={() => setSelectedOption(option)}
+                        className={`p-3 rounded-lg border cursor-pointer ${
+                                // selected AND correct AND answer shown -> special highlight
+                                selectedOption === option && showAnswer && option.startsWith(props.correctAnswer)
+                                    ? 'bg-gradient-to-r from-blue-900/50 to-green-900/50 border-green-400 text-white'
+                                // If the option is selected (not shown yet) -> blue highlight
+                                : selectedOption === option
+                                    ? 'bg-blue-900/50 border-blue-400 text-blue-200'
+                                // correct AND shown(not selected) -> green
+                                : showAnswer && option.startsWith(props.correctAnswer)
+                                    ? 'bg-green-900/30 border-green-500 text-green-200'
+                                // Default: gray
                                 : 'bg-gray-700 border-gray-600 text-gray-300'
                             }`}
                     >
                         {option}
-                        {option.startsWith(props.correctAnswer) && (
+                        {showAnswer && option.startsWith(props.correctAnswer) && (
                             <span className="ml-2 text-green-400">
                                 Correct
                             </span>
@@ -39,17 +55,39 @@ const QuestionCard = (props: QuestionCardProps) => {
                 ))}
             </div>
 
+            {/* Show Answer Button */}
+            <button
+                onClick={() => {
+                    if (!showAnswer && selectedOption !== null) {
+                        const isCorrect = selectedOption.startsWith(props.correctAnswer);
+                        props.onAnswerRevealed(isCorrect);
+                    }
+                    setShowAnswer(!showAnswer);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+            >
+                {showAnswer ? 'Hide Answer' : 'Show Answer'}
+            </button>
+
             {/* Explanation */}
-            <div className="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
-                <p className="text-sm font-medium text-blue-200 mb-1">
-                    Explanation:
-                </p>
-                <p className="text-sm text-blue-300">
-                    {props.explanation}
-                </p>
-            </div>
+            {showAnswer && (
+                <div className="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
+                    <p className="text-sm font-medium text-blue-200 mb-1">
+                        Explanation:
+                    </p>
+                    <p className="text-sm text-blue-300">
+                        {props.explanation}
+                    </p>
+                </div>
+            )}
         </div>
     )
 }
 
 export default QuestionCard;
+
+// Todo: 
+//  - ADD A way to select an option
+//  - ADD A way to see the selected option
+//  -  score tracker (parent component - page.tsx)
+//  - 

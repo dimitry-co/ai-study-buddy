@@ -17,11 +17,19 @@ export default function Home() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [score, setScore] = useState(0);
+
+  const handleAnswerRevealed = (isCorrect: boolean) => {
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+  };
 
   const generateQuestions = async () => {
     // Clear previous state (errors, questions)
     setError('');
     setQuestions([]);
+    setScore(0);
 
     // validate input (notes)
     if (!notes.trim()) {
@@ -57,9 +65,9 @@ export default function Home() {
       setLoading(false);
     }
   };
-  
+
   return (
-    <div className="min-h-screen bg-gray-900 p-8">
+    <div className="min-h-screen bg-gray-900/70 p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -71,8 +79,8 @@ export default function Home() {
         {/* Input Sections */}
         <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
           <div className="mb-6">
-            <label 
-              htmlFor="notes" 
+            <label
+              htmlFor="notes"
               className="block text-sm font-medium text-gray-300 mb-2"
             >
               Your Study Notes
@@ -88,8 +96,8 @@ export default function Home() {
 
           <div className="mb-6">
             <label
-            htmlFor="numQuestions"
-            className="block text-sm font-medium text-gray-300 mb-2"
+              htmlFor="numQuestions"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
               Number of Questions
             </label>
@@ -110,9 +118,9 @@ export default function Home() {
               disabled={loading || !notes.trim()}
               className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
             >
-              {loading ? '🔄 Generating Questions...' : '✨ Generate Questions'}
+              {loading ? 'Generating Questions...' : '✨ Generate Questions'}
             </button>
-          </div> 
+          </div>
         </div>
 
         {/* Error Display */}
@@ -126,9 +134,14 @@ export default function Home() {
         {/* Questions Display */}
         {questions.length > 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              Questions ({questions.length})
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white">
+                {questions.length} Questions
+              </h2>
+              <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+                Score: {score} / {questions.length}
+              </div>
+            </div>
 
             {questions.map((q, index) => (
               <QuestionCard
@@ -138,7 +151,8 @@ export default function Home() {
                 correctAnswer={q.correctAnswer}
                 explanation={q.explanation}
                 questionNumber={index + 1}
-              />  
+                onAnswerRevealed={handleAnswerRevealed}
+              />
             ))}
           </div>
         )}
