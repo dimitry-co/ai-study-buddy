@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 
 interface Question {
   id: number;
@@ -11,23 +11,23 @@ interface Question {
 }
 
 export default function Home() {
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState(5);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const generateQuestions = async () => {
     // Clear previous results
-    setError('');
+    setError("");
     setQuestions([]);
     setLoading(true);
 
     try {
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
+      const response = await fetch("/api/generate-questions", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           notes,
@@ -40,10 +40,10 @@ export default function Home() {
       if (response.ok) {
         setQuestions(data.questions);
       } else {
-        setError(data.error || 'Failed to generate questions');
+        setError(data.error || "Failed to generate questions");
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -103,7 +103,7 @@ export default function Home() {
             disabled={loading || !notes.trim()}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
           >
-            {loading ? '🔄 Generating Questions...' : '✨ Generate Questions'}
+            {loading ? "🔄 Generating Questions..." : "✨ Generate Questions"}
           </button>
         </div>
 
@@ -142,8 +142,8 @@ export default function Home() {
                       key={i}
                       className={`p-3 rounded-lg border ${
                         option.startsWith(q.correctAnswer)
-                          ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
-                          : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
+                          ? "bg-green-50 dark:bg-green-900/20 border-green-500"
+                          : "bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
                       }`}
                     >
                       <span className="font-medium text-gray-900 dark:text-white">

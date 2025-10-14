@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import QuestionCard from './components/QuestionCard';
+import { useState } from "react";
+import QuestionCard from "./components/QuestionCard";
 
 interface Question {
   id: number;
@@ -12,11 +12,11 @@ interface Question {
 }
 
 export default function Home() {
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState(25);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [score, setScore] = useState(0);
 
   const handleAnswerRevealed = (isCorrect: boolean) => {
@@ -27,22 +27,22 @@ export default function Home() {
 
   const generateQuestions = async () => {
     // Clear previous state (errors, questions)
-    setError('');
+    setError("");
     setQuestions([]);
     setScore(0);
 
     // validate input (notes)
     if (!notes.trim()) {
-      setError('Please enter some notes');
+      setError("Please enter some notes");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
+      const response = await fetch("/api/generate-questions", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           notes,
@@ -55,12 +55,10 @@ export default function Home() {
       if (response.ok) {
         setQuestions(data.questions);
       } else {
-        setError(data.error || 'Failed to generate questions');
+        setError(data.error || "Failed to generate questions");
       }
-
     } catch (error) {
-      setError('Network error, Please try again.');
-
+      setError("Network error, Please try again.");
     } finally {
       setLoading(false);
     }
@@ -71,9 +69,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white">
-            🎓 AI Study Buddy
-          </h1>
+          <h1 className="text-4xl font-bold text-white">🎓 AI Study Buddy</h1>
         </div>
 
         {/* Input Sections */}
@@ -118,7 +114,7 @@ export default function Home() {
               disabled={loading || !notes.trim()}
               className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
             >
-              {loading ? 'Generating Questions...' : '✨ Generate Questions'}
+              {loading ? "Generating Questions..." : "✨ Generate Questions"}
             </button>
           </div>
         </div>
