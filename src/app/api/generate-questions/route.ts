@@ -88,16 +88,48 @@ Remember to format your response as valid JSON with the structure I specified.`;
         let questions: Question[];
         try {
             const parsed = JSON.parse(responseContent);
-            // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
-            questions = parsed.questions || parsed;
+            questions = parsed.questions || parsed; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
 
             if (!Array.isArray(questions)) {
                 questions = [questions];
             }
+
         } catch (parseError) {
             console.error('JSON Parse Error Details:', parseError);  // Technical details
             throw new Error('Invalid response format from OpenAI');   // High-level message caught by outer catch block
         }
+        // Validate we got questions
+        if (questions.length === 0) {
+            throw new Error('OpenAI returned no questions');
+        }
+
+        // Validate each question structure
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i]
+
+            // check all required fields exist
+            if (!q.id || !q.question || !q.options || !q.correctAnswer || !q.explanation) {
+                throw new Error('Invalid question structure from OpenAI');
+            }
+            
+            // Check types
+            if (typeof q.id !== 'number') {
+                throw new Error(`Question ${i + 1}: id must be a number`)
+            }
+            if (typeof q.question !== 'string') {
+                throw new Error(`Question ${i + 1}: question must be a string`)
+            }
+            if (!Array.isArray(q.options) || q.options.length !== 4) {
+                throw new Error(`Question ${i + 1}: options must be an array with exactly 4 items`);
+            }
+            if (typeof q.correctAnswer !== 'string') {
+                throw new Error(`Question ${i + 1}: correctAnswer must be a string`)
+            }
+            if (typeof q.explanation !== 'string') {
+                throw new Error(`Question ${i + 1}: explanation must be a string`)
+            }
+        }
+            
 
         // Return the questions to the frontend
         return NextResponse.json(
@@ -129,9 +161,7 @@ Remember to format your response as valid JSON with the structure I specified.`;
 
         // Generic error response
         return NextResponse.json(
-            { 
-                error: 'Failed to generate questions'
-            },
+            { error: 'Failed to generate questions. Please try again.' },
             { status: 500 }
         );
     }
