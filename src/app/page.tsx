@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import QuestionCard from './components/QuestionCard';
 
 interface Question {
   id: number;
@@ -130,48 +131,14 @@ export default function Home() {
             </h2>
 
             {questions.map((q, index) => (
-              <div key={q.id} className="bg-gray-800 rounded-lg shadow-lg p-6">
-                {/* Question Number badge */}  
-                <span className="inline-block bg-blue-600 text-white text-sm font-semibold px-3 py-1 rounded-full mb-2">
-                  Question {index + 1}
-                </span>
-
-                {/* Question Text */}
-                <h3 className="text-lg font-semibold text-white mb-4">
-                  {q.question}
-                </h3>
-
-                {/* Options */}
-                <div className="space-y-2 mb-4">
-                  {q.options.map((option, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-lg border ${
-                        option.startsWith(q.correctAnswer)
-                        ? 'bg-green-900/30 border-green-500 text-green-200'
-                        : 'bg-gray-700 border-gray-600 text-gray-300'
-                      }`}
-                    >
-                      {option}
-                      {option.startsWith(q.correctAnswer) && (
-                        <span className="ml-2 text-green-400">
-                          Correct
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Explanation */}
-                <div className="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded"> 
-                  <p className="text-sm font-medium text-blue-200 mb-1">
-                    Explanation:
-                  </p>
-                  <p className="text-sm text-blue-300">
-                    {q.explanation}
-                  </p>
-                </div>
-              </div>
+              <QuestionCard
+                key={q.id}
+                question={q.question}
+                options={q.options}
+                correctAnswer={q.correctAnswer}
+                explanation={q.explanation}
+                questionNumber={index + 1}
+              />  
             ))}
           </div>
         )}
