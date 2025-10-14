@@ -5,7 +5,7 @@ interface QuestionCardProps {
   correctAnswer: string;
   explanation: string;
   questionNumber: number;
-  onAnswerRevealed: (isCorrect: boolean) => void;
+  onOptionSelected: (option: string) => void;
 }
 
 const QuestionCard = (props: QuestionCardProps) => {
@@ -29,12 +29,13 @@ const QuestionCard = (props: QuestionCardProps) => {
         {props.options.map((option, i) => (
           <div
             key={i}
-            onClick={() => setSelectedOption(option)}
+            onClick={() => {
+              setSelectedOption(option)
+              props.onOptionSelected(option)
+            }}
             className={`p-3 rounded-lg border cursor-pointer ${
               // selected AND correct AND answer shown -> special highlight
-              selectedOption === option &&
-              showAnswer &&
-              option.startsWith(props.correctAnswer)
+              selectedOption === option && showAnswer && option.startsWith(props.correctAnswer)
                 ? "bg-gradient-to-r from-blue-900/50 to-green-900/50 border-green-400 text-white"
                 : // If the option is selected (not shown yet) -> blue highlight
                   selectedOption === option
@@ -57,10 +58,6 @@ const QuestionCard = (props: QuestionCardProps) => {
       {/* Show Answer Button */}
       <button
         onClick={() => {
-          if (!showAnswer && selectedOption !== null) {
-            const isCorrect = selectedOption.startsWith(props.correctAnswer);
-            props.onAnswerRevealed(isCorrect);
-          }
           setShowAnswer(!showAnswer);
         }}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
@@ -85,4 +82,4 @@ export default QuestionCard;
 //  - ADD A way to select an option
 //  - ADD A way to see the selected option
 //  -  score tracker (parent component - page.tsx)
-//  -
+//  - 

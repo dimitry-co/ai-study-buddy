@@ -18,11 +18,27 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
+  const [userSelections, setUserSelections] = useState<{[key: number]: string}>({});
 
-  const handleAnswerRevealed = (isCorrect: boolean) => {
-    if (isCorrect) {
-      setScore(score + 1);
-    }
+  const handleOptionSelected= (questionId: number, selectedOption: string) => {
+    setUserSelections(prev => ({
+      ...prev,
+      [questionId]: selectedOption
+    }));
+  };
+
+  const showAllAnswers = () => {
+    // calulate score for all questions
+    let correctCount = 0;
+
+    questions.forEach(q => {
+      const userAnswer = userSelections[q.id];
+      if (userAnswer && userAnswer.startsWith(q.correctAnswer)) {
+        correctCount++;
+      }
+    });
+    console.log('correctCount:', correctCount); 
+    setScore(correctCount);
   };
 
   const generateQuestions = async () => {
@@ -30,6 +46,7 @@ export default function Home() {
     setError("");
     setQuestions([]);
     setScore(0);
+    setUserSelections({});
 
     // validate input (notes)
     if (!notes.trim()) {
@@ -137,6 +154,12 @@ export default function Home() {
               <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
                 Score: {score} / {questions.length}
               </div>
+              <button
+                onClick={showAllAnswers}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                Show Answers and Score
+              </button>
             </div>
 
             {questions.map((q, index) => (
@@ -147,7 +170,7 @@ export default function Home() {
                 correctAnswer={q.correctAnswer}
                 explanation={q.explanation}
                 questionNumber={index + 1}
-                onAnswerRevealed={handleAnswerRevealed}
+                onOptionSelected={(option) => handleOptionSelected(q.id, option)}
               />
             ))}
           </div>
