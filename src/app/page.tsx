@@ -19,6 +19,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
   const [userSelections, setUserSelections] = useState<{[key: number]: string}>({});
+  const [showAnswers, setShowAnswers] = useState<{[key: number]: boolean}>({});
 
   const handleOptionSelected= (questionId: number, selectedOption: string) => {
     setUserSelections(prev => ({
@@ -27,8 +28,8 @@ export default function Home() {
     }));
   };
 
-  const showAllAnswers = () => {
-    // calulate score for all questions
+  const showAnswersAndScore = () => {
+    // calulate score 
     let correctCount = 0;
 
     questions.forEach(q => {
@@ -37,8 +38,19 @@ export default function Home() {
         correctCount++;
       }
     });
-    console.log('correctCount:', correctCount); 
-    setScore(correctCount);
+    
+      setScore(correctCount);
+
+      // Show all answers
+      const allAnswers = questions.reduce((acc, q) => {
+        acc[q.id] = true; // set all to true
+        return acc;
+      }, {} as {[key: number]: boolean});
+      setShowAnswers(allAnswers);
+
+      
+
+      
   };
 
   const generateQuestions = async () => {
@@ -86,7 +98,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white">🎓 AI Study Buddy</h1>
+          <h1 className="text-4xl font-bold text-white">AI Study Buddy</h1>
         </div>
 
         {/* Input Sections */}
@@ -155,9 +167,9 @@ export default function Home() {
                 Score: {score} / {questions.length}
               </div>
               <button
-                onClick={showAllAnswers}
+                onClick={showAnswersAndScore}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-                >
+              >
                 Show Answers and Score
               </button>
             </div>
@@ -170,6 +182,8 @@ export default function Home() {
                 correctAnswer={q.correctAnswer}
                 explanation={q.explanation}
                 questionNumber={index + 1}
+                showAnswer={showAnswers[q.id] || false}
+                onToggleAnswer={(show) => setShowAnswers(prev => ({...prev, [q.id]: show}))}
                 onOptionSelected={(option) => handleOptionSelected(q.id, option)}
               />
             ))}

@@ -5,11 +5,12 @@ interface QuestionCardProps {
   correctAnswer: string;
   explanation: string;
   questionNumber: number;
+  showAnswer: boolean;
+  onToggleAnswer: (show: boolean) => void;
   onOptionSelected: (option: string) => void;
 }
 
 const QuestionCard = (props: QuestionCardProps) => {
-  const [showAnswer, setShowAnswer] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   return (
@@ -35,20 +36,20 @@ const QuestionCard = (props: QuestionCardProps) => {
             }}
             className={`p-3 rounded-lg border cursor-pointer ${
               // selected AND correct AND answer shown -> special highlight
-              selectedOption === option && showAnswer && option.startsWith(props.correctAnswer)
+              selectedOption === option && props.showAnswer && option.startsWith(props.correctAnswer)
                 ? "bg-gradient-to-r from-blue-900/50 to-green-900/50 border-green-400 text-white"
                 : // If the option is selected (not shown yet) -> blue highlight
                   selectedOption === option
                   ? "bg-blue-900/50 border-blue-400 text-blue-200"
                   : // correct AND shown(not selected) -> green
-                    showAnswer && option.startsWith(props.correctAnswer)
+                    props.showAnswer && option.startsWith(props.correctAnswer)
                     ? "bg-green-900/30 border-green-500 text-green-200"
                     : // Default: gray
                       "bg-gray-700 border-gray-600 text-gray-300"
             }`}
           >
             {option}
-            {showAnswer && option.startsWith(props.correctAnswer) && (
+            {props.showAnswer && option.startsWith(props.correctAnswer) && (
               <span className="ml-2 text-green-400">Correct</span>
             )}
           </div>
@@ -58,15 +59,15 @@ const QuestionCard = (props: QuestionCardProps) => {
       {/* Show Answer Button */}
       <button
         onClick={() => {
-          setShowAnswer(!showAnswer);
+          props.onToggleAnswer(!props.showAnswer);
         }}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
       >
-        {showAnswer ? "Hide Answer" : "Show Answer"}
+        {props.showAnswer ? "Hide Answer" : "Show Answer"}
       </button>
 
       {/* Explanation */}
-      {showAnswer && (
+      {props.showAnswer && (
         <div className="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
           <p className="text-sm font-medium text-blue-200 mb-1">Explanation:</p>
           <p className="text-sm text-blue-300">{props.explanation}</p>
@@ -79,7 +80,5 @@ const QuestionCard = (props: QuestionCardProps) => {
 export default QuestionCard;
 
 // Todo:
-//  - ADD A way to select an option
-//  - ADD A way to see the selected option
 //  -  score tracker (parent component - page.tsx)
-//  - 
+//  -  show answer and get score button
