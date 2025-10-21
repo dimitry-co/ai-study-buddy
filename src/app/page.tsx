@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import QuestionCard from "./components/QuestionCard";
+import { validateFile, extractTextFromFile } from '@/lib/fileParser';
 
 interface Question {
   id: number;
@@ -20,6 +21,10 @@ export default function Home() {
   const [score, setScore] = useState(0);
   const [userSelections, setUserSelections] = useState<{[key: number]: string}>({});
   const [showAnswers, setShowAnswers] = useState<{[key: number]: boolean}>({});
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('text'); // Track which input mode
+
+
 
   const handleOptionSelected= (questionId: number, selectedOption: string) => {
     setUserSelections(prev => ({
@@ -60,10 +65,39 @@ export default function Home() {
     setScore(0);
     setUserSelections({});
 
-    // validate input (notes)
-    if (!notes.trim()) {
-      setError("Please enter some notes");
-      return;
+    let contentToSend = "";
+
+    // Handle text mode input
+    if (inputMode === 'text') {
+      if (!notes.trim()) {
+        setError("Please enter some notes");
+        return;
+      }
+      contentToSend = notes
+    }
+
+    // Handle file mode input
+    if (inputMode === 'file') {
+      if (!selectedFile) {
+        setError("Please select a file");
+        return;
+      }
+
+      // 1. Validate file
+      const validation = validateFile(selectedFile);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid file.");
+        return;
+      }
+      // 2. Extract text from file
+      try {
+        setLoading(true);
+        contentToSend = await extractTextFromFile(selectedFile);
+      } catch (err: any) {
+        setError(err.message || "Failed to parse file.");
+        setLoading(false);
+        return;
+      }
     }
 
     setLoading(true);
@@ -74,7 +108,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          notes,
+          contentToSend,
           numberOfQuestions,
         }),
       });
@@ -108,15 +142,70 @@ export default function Home() {
               htmlFor="notes"
               className="block text-sm font-medium text-gray-300 mb-2"
             >
-              Your Study Notes
+              Upload Notes (PDF, PowerPoint, or Text)
             </label>
-            <textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Paste your study notes here Thel..."
-              className="w-full h-40 p-4 border border-gray-700 bg-gray-800 text-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+
+            {/* Input Method Selection Buttons */}
+            <div className="flex gap-4 mb-6"> 
+            <button
+                onClick={() => setInputMode('file')}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all ${
+                  inputMode === 'file'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                Upload File
+              </button>
+              <button
+                onClick={() => setInputMode('text')}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all ${
+                  inputMode === 'text'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                Text
+              </button>
+            </div>
+
+            {/* Conditionally render input based on mode */}
+            {inputMode === 'text' && (
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Paste your notes here..."
+                className="w-full h-40 p-4 border border-gray-700 bg-gray-800 text-white rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            )}
+
+            {inputMode === 'file' && (
+              <label
+                htmlFor="file-upload"
+                className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer block"
+              >
+                <input
+                  id="file-upload"
+                  type='file'
+                  accept='.pdf,.txt'
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setSelectedFile(file);
+                  }}
+                  className="hidden" 
+                />
+                <div className="text-gray-400">
+                  <p className="mt-4">Click to browse files or drag and drop here</p>
+
+                </div>                
+                {selectedFile && (
+                  <p className="text-blue-400 mt-2">
+                    Selected: {selectedFile.name}
+                  </p>
+                )}  
+              </label>
+            )}
           </div>
 
           <div className="mb-6">
@@ -140,7 +229,7 @@ export default function Home() {
           <div className="flex justify-center">
             <button
               onClick={generateQuestions}
-              disabled={loading || !notes.trim()}
+              disabled={loading || (inputMode === 'text' ? !notes.trim() : !selectedFile)}
               className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
             >
               {loading ? "Generating Questions..." : "✨ Generate Questions"}
