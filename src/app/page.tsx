@@ -108,7 +108,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contentToSend,
+          notes: contentToSend,
           numberOfQuestions,
         }),
       });
@@ -232,7 +232,7 @@ export default function Home() {
               disabled={loading || (inputMode === 'text' ? !notes.trim() : !selectedFile)}
               className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
             >
-              {loading ? "Generating Questions..." : "✨ Generate Questions"}
+              {loading ? "Generating Questions..." : "Generate Questions"}
             </button>
           </div>
         </div>
