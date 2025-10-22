@@ -9,8 +9,9 @@ jest.mock('@/lib/fileParser', () => ({
 
 describe('Home Page - Toggle Buttons', () => {
   it('should render both toggle buttons', () => {
-    render(<Home />);
+    render(<Home />); // 1. Render the component
     
+    // 2. Assert that the buttons are rendered
     expect(screen.getByText('Upload File')).toBeInTheDocument();
     expect(screen.getByText('Text')).toBeInTheDocument();
   });
