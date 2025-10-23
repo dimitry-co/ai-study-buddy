@@ -23,6 +23,7 @@ export default function Home() {
   const [showAnswers, setShowAnswers] = useState<{[key: number]: boolean}>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text'); // Track which input mode
+  const [questionType, setQuestionType] = useState<'mcq' | 'simple' | 'both'>('mcq');
 
 
 

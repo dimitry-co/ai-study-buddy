@@ -1,4 +1,4 @@
-// Learn more: https://github.com/testing-library/jest-dom
+// Jest setup file
 import '@testing-library/jest-dom'
 
 // Suppress act() warnings in tests

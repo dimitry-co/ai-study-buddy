@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import Home from '../page';
 
 // Mock the fileParser module since we're testing UI, not file parsing logic
-jest.mock('@/lib/fileParser', () => ({
+jest.mock('@/lib/fileParser', () => ({ 
   extractTextFromFile: jest.fn(),
   validateFile: jest.fn(() => ({ valid: true })),
 }));
