@@ -3,6 +3,7 @@
 import { useState } from "react";
 import QuestionCard from "./components/QuestionCard";
 import { validateFile, extractTextFromFile } from '@/lib/fileParser';
+import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/lib/ankiExport';
 
 interface Question {
   id: number;
@@ -12,10 +13,18 @@ interface Question {
   explanation: string;
 }
 
+interface SimpleCard {
+  id: number;
+  question: string;
+  answer: string;
+  hint?: string;
+}
+
 export default function Home() {
   const [notes, setNotes] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState(25);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [simpleCards, setSimpleCards] = useState<SimpleCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
@@ -52,19 +61,34 @@ export default function Home() {
         acc[q.id] = true; // set all to true
         return acc;
       }, {} as {[key: number]: boolean});
-      setShowAnswers(allAnswers);
-
-      
-
-      
+      setShowAnswers(allAnswers);    
   };
+  
+  // Download Anki Deck
+  const handleDownloadAnki = () => {
+    let tsvContent = "";
+    let fileName = "";
+    if (questionType === 'mcq' && questions.length > 0) {
+      tsvContent = exportMCQToAnki(questions);
+      fileName = "mcq-anki-deck";
+    } else if (questionType === 'simple' && simpleCards.length > 0) {
+      tsvContent = exportSimpleCardsToAnki(simpleCards);
+      fileName = "simple-anki-deck";
+    } else {
+      setError("No questions to export");
+      return;
+    }
+    downloadAnkiDeck(tsvContent, fileName);
+  }
 
   const generateQuestions = async () => {
     // Clear previous state (errors, questions)
     setError("");
     setQuestions([]);
+    setSimpleCards([]);
     setScore(0);
     setUserSelections({});
+    setShowAnswers({});
 
     let contentToSend = "";
 
@@ -111,13 +135,20 @@ export default function Home() {
         body: JSON.stringify({
           notes: contentToSend,
           numberOfQuestions,
+          questionType,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setQuestions(data.questions);
+        if (questionType === 'simple') {
+          setSimpleCards(data.cards || []);
+          setQuestions([]); // Clear MCQ questions
+        } else { // MCQ
+          setQuestions(data.questions || []);
+          setSimpleCards([]);
+        }
       } else {
         setError(data.error || "Failed to generate questions");
       }
@@ -209,6 +240,7 @@ export default function Home() {
             )}
           </div>
 
+          {/* Number of Question Selector */}
           <div className="mb-6">
             <label
               htmlFor="numQuestions"
@@ -225,6 +257,26 @@ export default function Home() {
               max="100"
               className="w-32 p-2 border border-gray-700 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* Question Type Selector */}
+          <div className="mb-6">
+             <label
+              htmlFor="questionType"
+              className="block text-sm font-medium text-gray-300 mb-2"
+            >
+              Question Type
+            </label>
+            <select
+              id="questionType"
+              value={questionType}
+              onChange={(e) => setQuestionType(e.target.value as 'mcq' | 'simple' | 'both')}
+              className="w-64 p-2 border border-gray-700 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+            >
+              <option value="mcq">Multiple Choice Questions (MCQ)</option>
+              <option value="simple">Anki Cards (Fill in the Blank)</option>
+              <option value="both">Both Types</option>
+            </select>
           </div>
 
           <div className="flex justify-center">
@@ -262,6 +314,12 @@ export default function Home() {
               >
                 Show Answers and Score
               </button>
+              <button
+                onClick={handleDownloadAnki}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  Download MCQ Anki Deck
+              </button>
             </div>
 
             {questions.map((q, index) => (
@@ -277,6 +335,44 @@ export default function Home() {
                 onOptionSelected={(option) => handleOptionSelected(q.id, option)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Simple Cards Display  */}
+        {simpleCards.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-white mb-4">
+                {simpleCards.length} Flashcards
+              </h2>
+              <button
+                onClick={handleDownloadAnki}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  Download Anki Deck
+              </button>
+            </div>
+
+            {simpleCards.map((card, index) => (
+              <div
+                key={card.id}
+                className="bg-gray-800 rounded-lg shadow-lg p-6"
+              >
+                <div className="mb-4"> 
+                  <span className="text-blue-400 font-semibold"> Card {index + 1}</span>
+                  <p className="text-white text-lg mt-2">{card.question}</p>
+                </div>
+
+                <div className="border-t border-gray-700 pt-4">
+                  <span className="text-green-400 font-semibold">Answer:</span>
+                  <p className="text-white mt-1">{card.answer}</p>
+                  {card.hint && (
+                    <p className="text-gray-400 text-sm mt-2">Hint: {card.hint}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+           
           </div>
         )}
       </div>

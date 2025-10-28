@@ -15,11 +15,18 @@ interface Question {
   explanation: string;
 }
 
+interface Card {
+  id: number;
+  question: string;
+  answer: string;
+  hint?: string;
+}
+
 // POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { notes, numberOfQuestions = 50 } = body;
+    const { notes, numberOfQuestions = 50, questionType = 'mcq' } = body;
 
     // Validate input
     if (!notes || notes.trim().length === 0) {
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Prompt for OpenAI - system prompt and user prompt
     // system prompt - Set the behavior and rule of the model
-    const systemPrompt = `You are an expert educational assistant that creates high-quality multiple-choice study questions.
+    const mcqSystemPrompt = `You are an expert educational assistant that creates high-quality multiple-choice study questions.
 
 Your questions should:
 - Test understanding, not just memorization
@@ -59,12 +66,60 @@ Always respond with valid JSON in this exact structure:
     }
   ]
 }`;
-    // User Prompt - The specific task with their data
-    const userPrompt = `Generate ${numberOfQuestions} multiple-choice question based on these study notes:
+
+    const simpleCardSystemPrompt = `You are an expert educational assistant that creates simple, memorable flashcards for spaced repetition learning (like Anki).
+
+Your cards should:
+- Have SHORT answers (1-3 words or a brief phrase)
+- Use fill-in-the-blank style when possible
+- Be easy to recall
+- Focus on key facts and concepts
+- Avoid complex explanations in the answer
+
+Always respond with valid JSON in this exact structure:
+{
+  "cards": [
+    {
+      "id": 1,
+      "question": "The capital of France is ______",
+      "answer": "Paris",
+      "hint": "Optional hint if needed"
+    }
+  ]
+}`;
+
+    let userPrompt = ""; // User Prompt - The specific task with their data
+    let systemPrompt = "";
+
+    if (questionType === 'mcq') {
+      systemPrompt = mcqSystemPrompt;
+      userPrompt = `Generate ${numberOfQuestions} multiple-choice question based on these study notes:
         
 ${notes}
 
 Remember to format your response as valid JSON with the structure I specified.`;
+    }
+
+    if (questionType === 'simple') {
+      systemPrompt = simpleCardSystemPrompt;
+      userPrompt = `Generate ${numberOfQuestions} simple flashcard questions based on these study notes:
+${notes}
+
+
+Make them concise and easy to remember. Use fill-in-the-blank style when appropriate.
+Remeber to format your response as valid JSON with the structure I specified.`;
+    }
+
+    if (questionType === 'both') {
+      // for 'both' we need to two API calls or a comnined prompt
+      // Start w. simple approach: just do MCQ for now, expand later
+      systemPrompt = mcqSystemPrompt;
+      userPrompt = `Generate ${numberOfQuestions} multiple-choice question based on these study notes:
+        
+${notes}
+
+Remember to format your response as valid JSON with the structure I specified.`;
+    }
 
     // Call OpenAI API
     console.log("Calling OpenAI API...");
@@ -86,63 +141,93 @@ Remember to format your response as valid JSON with the structure I specified.`;
 
     // Parse the JSON response
     let questions: Question[];
+    let result;
     try {
       const parsed = JSON.parse(responseContent);
-      questions = parsed.questions || parsed; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
 
-      if (!Array.isArray(questions)) {
-        questions = [questions];
+      if (questionType === 'simple') {
+        result = { cards: parsed.cards || parsed };
+      } else {
+        result = { questions: parsed.questions || parsed }; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
       }
     } catch (parseError) {
       console.error("JSON Parse Error Details:", parseError); // Technical details
       throw new Error("Invalid response format from OpenAI"); // High-level message caught by outer catch block
     }
     // Validate we got questions
-    if (questions.length === 0) {
-      throw new Error("OpenAI returned no questions");
-    }
-
-    // Validate each question structure
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-
-      // check all required fields exist
-      if (
-        !q.id ||
-        !q.question ||
-        !q.options ||
-        !q.correctAnswer ||
-        !q.explanation
-      ) {
-        throw new Error("Invalid question structure from OpenAI");
+    if (questionType === 'mcq') {
+      if (result.questions.length === 0) {
+        throw new Error("OpenAI returned no questions");
       }
-
-      // Check types
-      if (typeof q.id !== "number") {
-        throw new Error(`Question ${i + 1}: id must be a number`);
-      }
-      if (typeof q.question !== "string") {
-        throw new Error(`Question ${i + 1}: question must be a string`);
-      }
-      if (!Array.isArray(q.options) || q.options.length !== 4) {
-        throw new Error(
-          `Question ${i + 1}: options must be an array with exactly 4 items`,
-        );
-      }
-      if (typeof q.correctAnswer !== "string") {
-        throw new Error(`Question ${i + 1}: correctAnswer must be a string`);
-      }
-      if (typeof q.explanation !== "string") {
-        throw new Error(`Question ${i + 1}: explanation must be a string`);
+  
+      // Validate each question structure
+      for (let i = 0; i < result.questions.length; i++) {
+        const q = result.questions[i];
+  
+        // check all required fields exist
+        if (!q.id || !q.question || !q.options || !q.correctAnswer || !q.explanation) {
+          throw new Error("Invalid question structure from OpenAI");
+        }
+  
+        // Check types
+        if (typeof q.id !== "number") {
+          throw new Error(`Question ${i + 1}: id must be a number`);
+        }
+        if (typeof q.question !== "string") {
+          throw new Error(`Question ${i + 1}: question must be a string`);
+        }
+        if (!Array.isArray(q.options) || q.options.length !== 4) {
+          throw new Error(
+            `Question ${i + 1}: options must be an array with exactly 4 items`,
+          );
+        }
+        if (typeof q.correctAnswer !== "string") {
+          throw new Error(`Question ${i + 1}: correctAnswer must be a string`);
+        }
+        if (typeof q.explanation !== "string") {
+          throw new Error(`Question ${i + 1}: explanation must be a string`);
+        }
       }
     }
+
+    // Validate cards
+    if (questionType === 'simple') {
+      if (result.cards.length === 0) {
+        throw new Error("OpenAI returned no cards");;
+      }
+
+      // Validate each card structure
+      for (let i = 0; i < result.cards.length; i++) {
+        const c = result.cards[i];
+
+        // Check all required field exist
+        if (!c.id || !c.question || !c.answer) {
+          throw new Error("Invalid card structure from OpenAI");
+        }
+
+        // Check Types
+        if (typeof c.id !== "number") {
+          throw new Error(`Card ${i + 1}: id must be a number`);
+        }
+        if (typeof c.question !== "string") {
+          throw new Error(`Card ${i + 1}: questions must be a string`);
+        }
+        if (typeof c.answer !== "string") {
+          throw new Error(`Card ${i + 1}: answer must be a string`);
+        }
+        if (c.hint && typeof c.hint !== "string") {
+          throw new Error(`Card ${i + 1}: hint must be a string if provided`);
+        }
+      }
+    }
+    
 
     // Return the questions to the frontend
     return NextResponse.json(
       {
-        questions,
+        ...result,
         metadata: {
-          numberOfQuestions: questions.length,
+          numberOfQuestions: result.questions ? result.questions.length : result.cards ? result.cards.length : 0,
           model: "gpt-4o-mini",
           tokensUsed: completion.usage?.total_tokens || 0,
         },
