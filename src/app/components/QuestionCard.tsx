@@ -27,33 +27,43 @@ const QuestionCard = (props: QuestionCardProps) => {
 
       {/* Options */}
       <div className="space-y-2 mb-4">
-        {props.options.map((option, i) => (
-          <div
-            key={i}
-            onClick={() => {
-              setSelectedOption(option)
-              props.onOptionSelected(option)
-            }}
-            className={`p-3 rounded-lg border cursor-pointer ${
-              // selected AND correct AND answer shown -> special highlight
-              selectedOption === option && props.showAnswer && option.startsWith(props.correctAnswer)
-                ? "bg-gradient-to-r from-blue-900/50 to-green-900/50 border-green-400 text-white"
-                : // If the option is selected (not shown yet) -> blue highlight
-                  selectedOption === option
-                  ? "bg-blue-900/50 border-blue-400 text-blue-200"
-                  : // correct AND shown(not selected) -> green
-                    props.showAnswer && option.startsWith(props.correctAnswer)
-                    ? "bg-green-900/30 border-green-500 text-green-200"
-                    : // Default: gray
-                      "bg-gray-700 border-gray-600 text-gray-300"
-            }`}
-          >
-            {option}
-            {props.showAnswer && option.startsWith(props.correctAnswer) && (
-              <span className="ml-2 text-green-400">Correct</span>
-            )}
-          </div>
-        ))}
+        {props.options.map((option, i) => {
+          const isCorrect = option.startsWith(props.correctAnswer);
+          const isSelected = selectedOption === option;
+          const isUserWrong = props.showAnswer && isSelected && !isCorrect;
+          const isUserCorrect = props.showAnswer && isSelected && isCorrect;
+          const isRevealedAnswer = isCorrect && props.showAnswer
+
+          return (
+            <div
+              key={i}
+              onClick={() => {
+                setSelectedOption(option)
+                props.onOptionSelected(option)
+              }}
+              className={`p-3 rounded-lg border cursor-pointer ${
+                isUserWrong // selected AND wrong AND answer shown -> red highlight
+                  ? "bg-red-900/50 border-red-400 text-red-200"
+                  :// selected AND correct AND answer shown -> special highlight
+                    isUserCorrect
+                      ? "bg-gradient-to-r from-blue-900/50 to-green-900/50 border-green-400 text-white"
+                      : // If the option is selected (not shown yet) -> blue highlight
+                        isSelected
+                        ? "bg-blue-900/50 border-blue-400 text-blue-200"
+                        : // correct AND shown(not selected) -> green
+                          isRevealedAnswer
+                          ? "bg-green-900/30 border-green-500 text-green-200"
+                          : // Default: gray
+                            "bg-gray-700 border-gray-600 text-gray-300"
+              }`}
+            >
+              {option}
+              {props.showAnswer && option.startsWith(props.correctAnswer) && (
+                <span className="ml-2 text-green-400">Correct</span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Show Answer Button */}
@@ -78,7 +88,3 @@ const QuestionCard = (props: QuestionCardProps) => {
 };
 
 export default QuestionCard;
-
-// Todo:
-//  -  score tracker (parent component - page.tsx)
-//  -  show answer and get score button
