@@ -18,18 +18,18 @@ const extractTextFromFile = async(file: File): Promise<string> => {
 
     // Handle PDF files
     if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-        const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
-        const pdf = await loadingTask.promise;
+        const arrayBuffer = await file.arrayBuffer(); // Convert file to array buffer (binary data)
+        const loadingTask = pdfjsLib.getDocument({data: arrayBuffer}); // Create a loading task to load the PDF document
+        const pdf = await loadingTask.promise; // Wait for the loading task to complete and get the PDF document
         
         let fullText = '';
 
-        // Extract text from each page
+        // Extract text from each page. 
         for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items
-                .map((item: any) => item.str)
+            const page = await pdf.getPage(i); 
+            const textContent = await page.getTextContent(); 
+            const pageText = textContent.items 
+                .map((item: any) => item.str) 
                 .join(' ');
             fullText += pageText + '\n'; // Add newline between pages
         }
