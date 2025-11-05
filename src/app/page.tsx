@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from 'next/navigation';
 import QuestionCard from "./components/QuestionCard";
 import { validateFile, extractTextFromFile } from '@/lib/fileParser';
 import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/lib/ankiExport';
+import { getCurrentUser, isAdmin, hasActiveSubscription } from '@/lib/auth';
 
 interface Question {
   id: number;
@@ -21,11 +23,15 @@ interface SimpleCard {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true); // Loading state for auth checks
+  const [authError, setAuthError] = useState("");
   const [notes, setNotes] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState(25);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [simpleCards, setSimpleCards] = useState<SimpleCard[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);  // Loading state for question generation
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
   const [userSelections, setUserSelections] = useState<{[key: number]: string}>({});
@@ -34,9 +40,44 @@ export default function Home() {
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text'); // Track which input mode
   const [questionType, setQuestionType] = useState<'mcq' | 'simple' | 'both'>('mcq');
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { user, error } = await getCurrentUser();
 
+        // Not logged in - redirect to login if not logged in
+        if (!user || error) {
+          router.push('/login');
+          return;
+        }
 
-  const handleOptionSelected= (questionId: number, selectedOption: string) => {
+        // Check if admin (free access)
+        const admin = await isAdmin(user.email!);
+        if (admin) {
+          setIsAuthorized(true);
+          return;
+        }
+
+        // Check subscription - redirect to paywall if no subscription
+        const hasSubscription = await hasActiveSubscription(user.id);
+        if (!hasSubscription) {
+          router.push('/subscribe'); // well create this page later
+          return;
+        }
+
+        setIsAuthorized(true);
+
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setAuthError('Connection error. Please try again.'); // Network errors
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);  
+
+  const handleOptionSelected = (questionId: number, selectedOption: string) => {
     setUserSelections(prev => ({
       ...prev,
       [questionId]: selectedOption
@@ -158,6 +199,41 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Loading state for authentication 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <p className="text-white text-xl">Checking authentication...</p>
+      </div>
+    );
+  }
+
+  //Error state if network failed (with retry option)
+  if (authError && !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-400 text-xl mb-4">{authError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authorized
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <p className="text-gray-400 text-xl">Redirecting...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900/70 p-8">
