@@ -28,18 +28,21 @@ interface Card {
 // POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
 
-  // Get Supabase Server Client
+  // Get Next.js cookies (browser sent auth cookies with request)
   const cookieStore = await cookies();
 
+  // Create Supabase server-side client (can READ auth cookies/ has access to request cookies)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
+        // Tell supabase HOW to read cookies from Next.js (this function called by supabase to read all cookies from request)
         getAll() {
-          return cookieStore.getAll();
+          return cookieStore.getAll(); // Provide this function to supabase (Gets all cookies from request)
         },
-        setAll(cookiesToSet) {
+         // Tell supabase HOW to write new cookies (if needed)
+        setAll(cookiesToSet) {      // This function called by supabase to set all cookies in response
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
           });
@@ -47,6 +50,37 @@ export async function POST(request: NextRequest) {
       },
     }
   );
+
+  // Check if user is logged in (has auth cookie)
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (!user || authError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Check if admin
+  const ADMIN_EMAILS = ['gallegodimitry@gmail.com', 'khinethandrazaw1998.ktz@gmail.com'];
+  const isAdmin = ADMIN_EMAILS.includes(user.email!); // '!' means we know user.email is not null (because we checked for authError above)
+  if (!isAdmin) {
+    // Check subscription in database
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('status, current_period_end')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (!subscription) {
+      return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
+    }
+
+     // Check if active and not expired
+     const isActive = subscription.status === 'active';
+     const notExpired = new Date(subscription.current_period_end) > new Date();
+
+     if (!isActive || !notExpired) {
+      return NextResponse.json({ error: 'Subscription required or expired' }, { status: 402 });
+     }
+  }
 
   try {
     const body = await request.json();
@@ -242,8 +276,7 @@ Remember to format your response as valid JSON with the structure I specified.`;
           throw new Error(`Card ${i + 1}: hint must be a string if provided`);
         }
       }
-    }
-    
+    }   
 
     // Return the questions to the frontend
     return NextResponse.json(
