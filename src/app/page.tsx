@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import QuestionCard from "./components/QuestionCard";
 import { validateFile, extractTextFromFile } from '@/lib/fileParser';
 import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/lib/ankiExport';
-import { getCurrentUser, isAdmin, hasActiveSubscription } from '@/lib/auth';
+import { getCurrentUser, isAdmin, hasActiveSubscription, signOut } from '@/lib/auth';
 
 interface Question {
   id: number;
@@ -120,7 +120,12 @@ export default function Home() {
       return;
     }
     downloadAnkiDeck(tsvContent, fileName);
-  }
+  };
+
+  const handleSignout = async () => {
+    await signOut();
+    router.push('/login');
+  };
 
   const generateQuestions = async () => {
     // Clear previous state (errors, questions)
@@ -239,8 +244,16 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900/70 p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white">AI Study Buddy</h1>
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-4xl font-bold text-white">AI Study Buddy</h1>
+            <button
+              onClick={handleSignout}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Input Sections */}
