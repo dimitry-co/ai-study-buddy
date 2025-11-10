@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-lg p-8 max-w-md w-full">
+      <div className="bg-gray-800 rounded-2xl p-8 max-w-md w-full">
         <h1 className="text-3xl font-bold text-white mb-6 text-center">
           {isSignUpMode ? 'Sign Up' : 'Sign In'}
         </h1>

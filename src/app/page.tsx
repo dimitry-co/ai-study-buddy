@@ -185,7 +185,7 @@ export default function Home() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json(); // We don't receive all the data at once, we receive it in chunks. so we need to wait for the data to be fully received. this line uses await, receives the data and parses it into a JavaScript object.
 
       if (response.ok) {
         if (questionType === 'simple') {
@@ -249,7 +249,7 @@ export default function Home() {
             <h1 className="text-4xl font-bold text-white">AI Study Buddy</h1>
             <button
               onClick={handleSignout}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-3xl font-semibold transition-colors"
             >
               Logout
             </button>
@@ -257,7 +257,7 @@ export default function Home() {
         </div>
 
         {/* Input Sections */}
-        <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+        <div className="bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
           <div className="mb-6">
             <label
               htmlFor="notes"
@@ -270,7 +270,7 @@ export default function Home() {
             <div className="flex gap-4 mb-6"> 
             <button
                 onClick={() => setInputMode('file')}
-                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all ${
+                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all ${
                   inputMode === 'file'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -280,7 +280,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => setInputMode('text')}
-                className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all ${
+                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all ${
                   inputMode === 'text'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -372,7 +372,7 @@ export default function Home() {
             <button
               onClick={generateQuestions}
               disabled={loading || (inputMode === 'text' ? !notes.trim() : !selectedFile)}
-              className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg transition-colors"
+              className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-3xl transition-colors"
             >
               {loading ? "Generating Questions..." : "Generate Questions"}
             </button>
