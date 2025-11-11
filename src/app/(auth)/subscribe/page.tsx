@@ -23,21 +23,33 @@ export default function SubscribePage() {
     }
   };
 
-  const handleSubscrube = async () => {
+  const handleSubscribe = async () => {
     setLoading(true);
     setError('');
 
     try {
-      // TODO: Add stripe checkout here later
-      // For now, just show a message
-      alert('payment integration coming soon! For now, contact admin.');
+      // Call API to create Stripe checkout session
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Ensure cookies are sent
+      });
 
-      // Later this will redirect to Strip checkout:
-      // const response = aweait fetch('/api/create-checkout', { method: 'POST' });
-      // const url = await response.json();
-      // window.location.href = url;
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle errors from API
+        setError(data.error || 'Failed to create checkout session');
+        return;
+      }
+
+      // redirect to Stripe's hosted checkout page
+      window.location.href = data.url;
 
     } catch (err) {
+      console.error('Checkout error:', err);
       setError('Unable to process. Please try again.');
     } finally {
       setLoading(false);
@@ -108,7 +120,7 @@ export default function SubscribePage() {
 
         {/* Subscribe Button */}
         <button
-          onClick={handleSubscrube}
+          onClick={handleSubscribe}
           disabled={loading}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-3 rounded-3xl font-semibold mb-4"
         >
