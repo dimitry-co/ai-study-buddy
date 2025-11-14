@@ -64,11 +64,15 @@ const hasActiveSubscription = async (userId: string) => {
 
   if (error || !data) return false;
 
-  // Check if active and not expired
-  const isActive = data.status === 'active';
+  // Allow access if:
+  // 1. Status is 'active' (actively paying), OR
+  // 2. Status is 'canceled' (user canceled but still in paid period)
+  // AND subscription hasn't expired yet (current_period_end is in future)
+  const validStatuses = ['active', 'canceled'];
+  const hasValidStatus = validStatuses.includes(data.status);
   const notExpired = new Date(data.current_period_end) > new Date();
 
-  return isActive && notExpired;
+  return hasValidStatus && notExpired;
 };
 
 export { signUp, signIn, signOut, getCurrentUser, isAdmin, hasActiveSubscription };
