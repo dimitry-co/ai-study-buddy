@@ -75,7 +75,7 @@ export default function Home() {
       }
     };
     checkAuth();
-  }, []);  
+  }, [router]);  
 
   const handleOptionSelected = (questionId: number, selectedOption: string) => {
     setUserSelections(prev => ({

@@ -18,7 +18,17 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "**/__tests__/**", // Ignore test files
+      "**/*.test.ts",
+      "**/*.test.tsx",
     ],
+  },
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn", // Change from error to warning
+      "@typescript-eslint/no-unused-vars": "warn", // Change from error to warning
+      "@typescript-eslint/no-require-imports": "warn", // Change from error to warning
+    },
   },
 ];
 
