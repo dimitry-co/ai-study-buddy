@@ -1,8 +1,3 @@
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Set up the worker - required for pdfjs-dist
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-
 /**
  * Parse a file and extract its text content
  * Supports: PDF and TXT files (for now)
@@ -18,6 +13,12 @@ const extractTextFromFile = async(file: File): Promise<string> => {
 
     // Handle PDF files
     if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+        // Dynamic import - only load pdfjs-dist when actually parsing PDF (client-side only)
+        const pdfjsLib = await import('pdfjs-dist');
+        
+        // Set up the worker - required for pdfjs-dist
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        
         const arrayBuffer = await file.arrayBuffer(); // Convert file to array buffer (binary data)
         const loadingTask = pdfjsLib.getDocument({data: arrayBuffer}); // Create a loading task to load the PDF document
         const pdf = await loadingTask.promise; // Wait for the loading task to complete and get the PDF document
