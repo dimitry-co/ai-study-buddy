@@ -1,5 +1,8 @@
 "use client";
 
+// Force dynamic rendering - prevents build-time prerendering (pdfjs-dist needs browser APIs)
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import QuestionCard from "./components/QuestionCard";

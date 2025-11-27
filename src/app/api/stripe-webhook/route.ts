@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   // Handle different event types. 
   try {
     switch (event.type) {
-      case 'checkout.session.completed': { // User completed payment
+      case 'checkout.session.completed': { // User completed payment (first time OR auto-renewal)
         const session = event.data.object  as Stripe.Checkout.Session; // Type assertion to get the session object
 
         // Get subscription details from Stripe. (we use subscriptions.retrieve to get the subscription details from Stripe using the subscription id from the session object)
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case 'customer.subscription.updated': { // Subscription is updated (renewed, changed plan, canceled, etc.)
+      case 'customer.subscription.updated': { // Subscription is updated (changed plan or canceled)
         const subscription: any = await stripe.subscriptions.retrieve(
           (event.data.object as Stripe.Subscription).id
         );

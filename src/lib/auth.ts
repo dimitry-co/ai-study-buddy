@@ -69,10 +69,10 @@ const hasActiveSubscription = async (userId: string) => {
   // 2. Status is 'canceled' (user canceled but still in paid period)
   // AND subscription hasn't expired yet (current_period_end is in future)
   const validStatuses = ['active', 'canceled'];
-  const hasValidStatus = validStatuses.includes(data.status);
+  const isActive = validStatuses.includes(data.status);
   const notExpired = new Date(data.current_period_end) > new Date();
 
-  return hasValidStatus && notExpired;
+  return isActive && notExpired;
 };
 
 export { signUp, signIn, signOut, getCurrentUser, isAdmin, hasActiveSubscription };
