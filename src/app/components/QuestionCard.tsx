@@ -58,7 +58,7 @@ const QuestionCard = (props: QuestionCardProps) => {
               }`}
             >
               {option}
-              {props.showAnswer && option.startsWith(props.correctAnswer) && (
+              {props.showAnswer && isCorrect && (
                 <span className="ml-2 text-green-400">Correct</span>
               )}
             </div>
@@ -71,14 +71,14 @@ const QuestionCard = (props: QuestionCardProps) => {
         onClick={() => {
           props.onToggleAnswer(!props.showAnswer);
         }}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+        className="bg-slate-700 hover:bg-slate-600 text-gray-200 font-semibold py-2 px-6 rounded-3xl transition-colors border border-slate-600 cursor-pointer"
       >
         {props.showAnswer ? "Hide Answer" : "Show Answer"}
       </button>
 
       {/* Explanation */}
       {props.showAnswer && (
-        <div className="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
+        <div className="mt-4 bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
           <p className="text-sm font-medium text-blue-200 mb-1">Explanation:</p>
           <p className="text-sm text-blue-300">{props.explanation}</p>
         </div>

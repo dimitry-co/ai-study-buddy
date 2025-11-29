@@ -37,11 +37,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);  // Loading state for question generation
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
-  const [userSelections, setUserSelections] = useState<{[key: number]: string}>({});
-  const [showAnswers, setShowAnswers] = useState<{[key: number]: boolean}>({});
+  const [userSelections, setUserSelections] = useState<{ [key: number]: string }>({});
+  const [showAnswers, setShowAnswers] = useState<{ [key: number]: boolean }>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text'); // Track which input mode
-  const [questionType, setQuestionType] = useState<'mcq' | 'simple' | 'both'>('mcq');
+  const [questionType, setQuestionType] = useState<'mcq' | 'simple'>('mcq');
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -78,7 +78,7 @@ export default function Home() {
       }
     };
     checkAuth();
-  }, [router]);  
+  }, [router]);
 
   const handleOptionSelected = (questionId: number, selectedOption: string) => {
     setUserSelections(prev => ({
@@ -97,17 +97,17 @@ export default function Home() {
         correctCount++;
       }
     });
-    
-      setScore(correctCount);
 
-      // Show all answers
-      const allAnswers = questions.reduce((acc, q) => {
-        acc[q.id] = true; // set all to true
-        return acc;
-      }, {} as {[key: number]: boolean});
-      setShowAnswers(allAnswers);    
+    setScore(correctCount);
+
+    // Show all answers
+    const allAnswers = questions.reduce((acc, q) => {
+      acc[q.id] = true; // set all to true
+      return acc;
+    }, {} as { [key: number]: boolean });
+    setShowAnswers(allAnswers);
   };
-  
+
   // Download Anki Deck
   const handleDownloadAnki = () => {
     let tsvContent = "";
@@ -252,7 +252,7 @@ export default function Home() {
             <h1 className="text-4xl font-bold text-white">AI Study Buddy</h1>
             <button
               onClick={handleSignout}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-3xl font-semibold transition-colors"
+              className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-3xl font-semibold transition-colors cursor-pointer"
             >
               Logout
             </button>
@@ -270,24 +270,22 @@ export default function Home() {
             </label>
 
             {/* Input Method Selection Buttons */}
-            <div className="flex gap-4 mb-6"> 
-            <button
+            <div className="flex gap-4 mb-6">
+              <button
                 onClick={() => setInputMode('file')}
-                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all ${
-                  inputMode === 'file'
-                  ? 'bg-blue-600 text-white'
+                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'file'
+                  ? 'bg-white text-gray-900'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 Upload File
               </button>
               <button
                 onClick={() => setInputMode('text')}
-                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all ${
-                  inputMode === 'text'
-                  ? 'bg-blue-600 text-white'
+                className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'text'
+                  ? 'bg-white text-gray-900'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 Text
               </button>
@@ -317,17 +315,17 @@ export default function Home() {
                     const file = e.target.files?.[0];
                     if (file) setSelectedFile(file);
                   }}
-                  className="hidden" 
+                  className="hidden"
                 />
                 <div className="text-gray-400">
                   <p className="mt-4">Click to browse files or drag and drop here</p>
 
-                </div>                
+                </div>
                 {selectedFile && (
                   <p className="text-blue-400 mt-2">
                     Selected: {selectedFile.name}
                   </p>
-                )}  
+                )}
               </label>
             )}
           </div>
@@ -353,7 +351,7 @@ export default function Home() {
 
           {/* Question Type Selector */}
           <div className="mb-6">
-             <label
+            <label
               htmlFor="questionType"
               className="block text-sm font-medium text-gray-300 mb-2"
             >
@@ -362,12 +360,11 @@ export default function Home() {
             <select
               id="questionType"
               value={questionType}
-              onChange={(e) => setQuestionType(e.target.value as 'mcq' | 'simple' | 'both')}
+              onChange={(e) => setQuestionType(e.target.value as 'mcq' | 'simple')}
               className="w-64 p-2 border border-gray-700 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
             >
-              <option value="mcq">Multiple Choice Questions (MCQ)</option>
+              <option value="mcq">Multiple Choice Questions</option>
               <option value="simple">Anki Cards (Fill in the Blank)</option>
-              <option value="both">Both Types</option>
             </select>
           </div>
 
@@ -375,7 +372,7 @@ export default function Home() {
             <button
               onClick={generateQuestions}
               disabled={loading || (inputMode === 'text' ? !notes.trim() : !selectedFile)}
-              className="w-full max-w-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-3xl transition-colors"
+              className="w-full max-w-sm bg-white hover:bg-gray-200 active:bg-gray-300 cursor-pointer disabled:bg-gray-500 disabled:cursor-not-allowed disabled:hover:bg-gray-500 text-gray-900 font-semibold py-3 rounded-3xl transition-colors"
             >
               {loading ? "Generating Questions..." : "Generate Questions"}
             </button>
@@ -402,15 +399,15 @@ export default function Home() {
               </div>
               <button
                 onClick={showAnswersAndScore}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
               >
                 Show Answers and Score
               </button>
               <button
                 onClick={handleDownloadAnki}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  Download MCQ Anki Deck
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+              >
+                Download MCQ Anki Deck
               </button>
             </div>
 
@@ -423,7 +420,7 @@ export default function Home() {
                 explanation={q.explanation}
                 questionNumber={index + 1}
                 showAnswer={showAnswers[q.id] || false}
-                onToggleAnswer={(show) => setShowAnswers(prev => ({...prev, [q.id]: show}))}
+                onToggleAnswer={(show) => setShowAnswers(prev => ({ ...prev, [q.id]: show }))}
                 onOptionSelected={(option) => handleOptionSelected(q.id, option)}
               />
             ))}
@@ -439,9 +436,9 @@ export default function Home() {
               </h2>
               <button
                 onClick={handleDownloadAnki}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-                >
-                  Download Anki Deck
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+              >
+                Download Anki Deck
               </button>
             </div>
 
@@ -450,24 +447,36 @@ export default function Home() {
                 key={card.id}
                 className="bg-gray-800 rounded-lg shadow-lg p-6"
               >
-                <div className="mb-4"> 
+                <div className="mb-4">
                   <span className="text-blue-400 font-semibold"> Card {index + 1}</span>
                   <p className="text-white text-lg mt-2">{card.question}</p>
                 </div>
 
-                <div className="border-t border-gray-700 pt-4">
-                  <span className="text-green-400 font-semibold">Answer:</span>
-                  <p className="text-white mt-1">{card.answer}</p>
-                  {card.hint && (
-                    <p className="text-gray-400 text-sm mt-2">Hint: {card.hint}</p>
-                  )}
-                </div>
+                {showAnswers[card.id] && (
+                  <div className="p-3 border-t border-gray-700 pt-4">
+                    <span className="text-green-400 font-semibold">Answer:</span>
+                    <p className="text-white mt-1">{card.answer}</p>
+                    {card.hint && (
+                      <p className="text-gray-400 text-sm mt-2">Hint: {card.hint}</p>
+                    )}
+                  </div>)}
+
+                {/* Show Answer Button */}
+                <button
+                  onClick={() => {
+                    setShowAnswers(prev => ({ ...prev, [card.id]: !showAnswers[card.id] }))
+                  }}
+                  className="bg-slate-700 hover:bg-slate-600 text-gray-200 font-semibold py-2 px-6 rounded-3xl transition-colors border border-slate-600 cursor-pointer"
+                >
+                  {showAnswers[card.id] ? "Hide Answer" : "Show Answer"}
+                </button>
+
               </div>
             ))}
-           
+
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 }
