@@ -70,7 +70,9 @@ export async function POST(request: NextRequest) {
       .from('subscriptions')
       .select('status, current_period_end')
       .eq('user_id', user.id)
-      .single();
+      .order('created_at', { ascending: false }) // order where the lastest subscription record is first
+      .limit(1) // get only the lastest subscription record
+      .single(); // return as single object (not an array)
 
     // Check if active and not expired (is subscribed). (!! converts any value to boolean so null -> false)
     isSubscribed = !!(subscription && 

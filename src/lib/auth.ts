@@ -60,6 +60,8 @@ const hasActiveSubscription = async (userId: string) => {
     .from('subscriptions') // Query the subscriptions table
     .select('status, current_period_end') // get these two columns
     .eq('user_id', userId) // Filter by user_id
+    .order('created_at', {ascending: false}) // get the latest subscription record
+    .limit(1) // 
     .single(); // expect exactly one result (get single subscription record)
 
   if (error || !data) return false;
@@ -82,7 +84,7 @@ const getFreeGenerationsUsed = async (userId: string) => {
   const {data, error} = await supabase
     .from('profiles')
     .select('free_generations_used')
-    .eq('user_id', userId)
+    .eq('id', userId)
     .single();
   
   if (error || !data) return 0;

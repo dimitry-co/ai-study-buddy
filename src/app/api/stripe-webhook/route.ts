@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed': { // User completed payment (first time OR auto-renewal)
-        const session = event.data.object  as Stripe.Checkout.Session; // Type assertion to get the session object
+        const session = event.data.object as Stripe.Checkout.Session; // Type assertion to get the session object
 
         // Get subscription details from Stripe. (we use subscriptions.retrieve to get the subscription details from Stripe using the subscription id from the session object)
         const subscriptionId = session.subscription as string; 
