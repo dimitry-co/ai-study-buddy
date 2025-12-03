@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-
 // Initialize OpenAI client with API key from env variables
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -28,6 +27,7 @@ interface Card {
 // POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
 
+
   // Get Next.js cookies (browser sent auth cookies with request)
   const cookieStore = await cookies();
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         getAll() {
           return cookieStore.getAll(); // Provide this function to supabase (Gets all cookies from request)
         },
-         // Tell supabase HOW to write new cookies (if needed)
+        // Tell supabase HOW to write new cookies (if needed)
         setAll(cookiesToSet) {      // This function called by supabase to set all cookies in response
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
@@ -61,6 +61,9 @@ export async function POST(request: NextRequest) {
   // Check if admin
   const ADMIN_EMAILS = ['gallegodimitry@gmail.com', 'khinethandrazaw1998.ktz@gmail.com'];
   const isAdmin = ADMIN_EMAILS.includes(user.email!); // '!' means we know user.email is not null (because we checked for authError above)
+  let isSubscribed = false;
+  let freeUsed = 0;
+
   if (!isAdmin) {
     // Check subscription in database
     const { data: subscription } = await supabase
@@ -68,18 +71,29 @@ export async function POST(request: NextRequest) {
       .select('status, current_period_end')
       .eq('user_id', user.id)
       .single();
-    
-    if (!subscription) {
-      return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
+
+    // Check if active and not expired (is subscribed). (!! converts any value to boolean so null -> false)
+    isSubscribed = !!(subscription && 
+      (subscription.status === 'active' || subscription.status === 'canceled') &&
+      new Date(subscription.current_period_end) > new Date());
+
+    if (!isSubscribed) {
+      // Check free tier limit
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('free_generations_used')
+        .eq('id', user.id)
+        .single();
+      
+      freeUsed = profile?.free_generations_used || 0;
+
+      if (freeUsed >= 2) {
+        return NextResponse.json({
+          error: 'Free trial ended. Please subscribe to continue studying.',
+          requiresSubscription: true
+        }, {status: 403});
+      }
     }
-
-     // Check if active and not expired
-     const isActive = subscription.status === 'active';
-     const notExpired = new Date(subscription.current_period_end) > new Date();
-
-     if (!isActive || !notExpired) {
-      return NextResponse.json({ error: 'Subscription required or expired' }, { status: 402 });
-     }
   }
 
   try {
@@ -216,16 +230,16 @@ Remember to format your response as valid JSON with the structure I specified.`;
       if (result.questions.length === 0) {
         throw new Error("OpenAI returned no questions");
       }
-  
+
       // Validate each question structure
       for (let i = 0; i < result.questions.length; i++) {
         const q = result.questions[i];
-  
+
         // check all required fields exist
         if (!q.id || !q.question || !q.options || !q.correctAnswer || !q.explanation) {
           throw new Error("Invalid question structure from OpenAI");
         }
-  
+
         // Check types
         if (typeof q.id !== "number") {
           throw new Error(`Question ${i + 1}: id must be a number`);
@@ -276,7 +290,15 @@ Remember to format your response as valid JSON with the structure I specified.`;
           throw new Error(`Card ${i + 1}: hint must be a string if provided`);
         }
       }
-    }   
+    }
+
+    // Increment free generations used (only for free tier)
+    if (!isAdmin && !isSubscribed) {
+      await supabase
+        .from('profiles')
+        .update({ free_generations_used: freeUsed + 1 })
+        .eq('id', user.id)
+    }
 
     // Return the questions to the frontend
     return NextResponse.json(

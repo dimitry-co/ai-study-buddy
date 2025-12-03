@@ -75,4 +75,33 @@ const hasActiveSubscription = async (userId: string) => {
   return isActive && notExpired;
 };
 
-export { signUp, signIn, signOut, getCurrentUser, isAdmin, hasActiveSubscription };
+/**
+ * Get number of free questions generations used
+ */
+const getFreeGenerationsUsed = async (userId: string) => {
+  const {data, error} = await supabase
+    .from('profiles')
+    .select('free_generations_used')
+    .eq('user_id', userId)
+    .single();
+  
+  if (error || !data) return 0;
+  return data.free_generations_used;
+};
+
+/**
+ * Check is uere has access to generate questions
+ */
+const hasAccessToGenerate = async (userId: string, userEmail: string) => {
+  // Admin has access
+  if (await isAdmin(userEmail)) return true;
+
+  // Subsribers have access
+  if (await hasActiveSubscription(userId)) return true;
+
+  // Free tier: less than 2 generations used
+  const freeUsed = await getFreeGenerationsUsed(userId);
+  return freeUsed < 2;
+}
+
+export { signUp, signIn, signOut, getCurrentUser, isAdmin, hasActiveSubscription, getFreeGenerationsUsed, hasAccessToGenerate };

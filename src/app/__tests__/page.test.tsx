@@ -22,10 +22,10 @@ describe('Home Page - Toggle Buttons', () => {
     const fileButton = screen.getByText('Upload File');
     const textButton = screen.getByText('Text');
     
-    // Text button should have active styling (bg-blue-600)
-    expect(textButton).toHaveClass('bg-blue-600');
-    // File button should have inactive styling (bg-gray-700)
-    expect(fileButton).toHaveClass('bg-gray-700');
+    // Text button should have active styling (bg-white text-gray-900)
+    expect(textButton).toHaveClass('bg-white text-gray-900');
+    // File button should have inactive styling (bg-gray-700 text-gray-300)
+    expect(fileButton).toHaveClass('bg-gray-700 text-gray-300');
   });
 
   it('should show textarea in text mode by default', () => {

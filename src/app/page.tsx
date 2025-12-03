@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import QuestionCard from "./components/QuestionCard";
 import { validateFile, extractTextFromFile } from '@/lib/fileParser';
 import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/lib/ankiExport';
-import { getCurrentUser, isAdmin, hasActiveSubscription, signOut } from '@/lib/auth';
+import { getCurrentUser, isAdmin, hasActiveSubscription, signOut, getFreeGenerationsUsed, hasAccessToGenerate } from '@/lib/auth';
 
 interface Question {
   id: number;
@@ -42,11 +42,14 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text'); // Track which input mode
   const [questionType, setQuestionType] = useState<'mcq' | 'simple'>('mcq');
+  const [isFreeTier, setIsFreeTier] = useState(false);
+  const [freeGenerationsLeft, setFreeGenerationsLeft] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const { user, error } = await getCurrentUser();
+        console.log('1. User:', user?.email);
 
         // Not logged in - redirect to login if not logged in
         if (!user || error) {
@@ -54,21 +57,37 @@ export default function Home() {
           return;
         }
 
-        // Check if admin (free access)
-        const admin = await isAdmin(user.email!);
-        if (admin) {
-          setIsAuthorized(true);
-          return;
-        }
+        // check if user has access to generate questions
+        const canAccess = await hasAccessToGenerate(user.id, user.email!);
+        console.log('2. canAccess:', canAccess);
 
-        // Check subscription - redirect to paywall if no subscription
-        const hasSubscription = await hasActiveSubscription(user.id);
-        if (!hasSubscription) {
-          router.push('/subscribe'); // well create this page later
+        if (!canAccess) {
+          router.push('/subscribe');
           return;
         }
 
         setIsAuthorized(true);
+
+        const userIsAdmin = await isAdmin(user.email!);
+        console.log('3. userIsAdmin:', userIsAdmin);
+        if (userIsAdmin) {
+          return;
+        }
+
+        const isSubscribed = await hasActiveSubscription(user.id);
+        console.log('4. isSubscribed:', isSubscribed);
+        if (isSubscribed) {
+          return;
+        }
+
+        // Not admin, not subscribed -> free tier (check how many generations left)
+        const freeUsed = await getFreeGenerationsUsed(user.id);
+        console.log('5. freeUsed:', freeUsed);
+
+        // User is on free tier with generations left
+        setIsFreeTier(true);
+        setFreeGenerationsLeft(2 - freeUsed);
+        console.log('6. freeGenerationsLeft:', freeGenerationsLeft);
 
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -198,6 +217,16 @@ export default function Home() {
           setQuestions(data.questions || []);
           setSimpleCards([]);
         }
+        console.log('Before decrement - isFreeTier:', isFreeTier);
+
+        // Update free tier counter in UI
+        if (isFreeTier) {
+          //setFreeGenerationsLeft(prev => prev - 1);
+          setFreeGenerationsLeft(prev => {
+            console.log('Decrementing from', prev, 'to', prev - 1);
+            return prev - 1;
+          });
+        }
       } else {
         setError(data.error || "Failed to generate questions");
       }
@@ -258,6 +287,14 @@ export default function Home() {
             </button>
           </div>
         </div>
+
+        {isFreeTier && freeGenerationsLeft > 0 && (
+          <div className="bg-blue-900/30 border border-blue-500 rounded-2xl p-4 mb-4">
+            <p className="text-blue-300">
+              Free trial: <strong>{freeGenerationsLeft}</strong> generation{freeGenerationsLeft !== 1 ? 's' : ''} remaining
+            </p>
+          </div>
+        )}
 
         {/* Input Sections */}
         <div className="bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
