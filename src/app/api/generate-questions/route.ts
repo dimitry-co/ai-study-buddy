@@ -2,27 +2,18 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { ADMIN_EMAILS, FREE_GENERATION_LIMIT } from '@/lib/constants';
+import {
+  mcqSystemPrompt,
+  flashCardSystemPrompt,
+  buildMCQUserPrompt,
+  buildFlashCardUserPrompt,
+} from '@/lib/prompts';
 
 // Initialize OpenAI client with API key from env variables
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// Define the structure of a question
-interface Question {
-  id: number;
-  question: string;
-  options: string[];
-  correctAnswer: string;
-  explanation: string;
-}
-
-interface Card {
-  id: number;
-  question: string;
-  answer: string;
-  hint?: string;
-}
 
 // POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
@@ -59,7 +50,6 @@ export async function POST(request: NextRequest) {
   }
 
   // Check if admin
-  const ADMIN_EMAILS = ['gallegodimitry@gmail.com', 'khinethandrazaw1998.ktz@gmail.com'];
   const isAdmin = ADMIN_EMAILS.includes(user.email!); // '!' means we know user.email is not null (because we checked for authError above)
   let isSubscribed = false;
   let freeUsed = 0;
@@ -89,7 +79,7 @@ export async function POST(request: NextRequest) {
       
       freeUsed = profile?.free_generations_used || 0;
 
-      if (freeUsed >= 2) {
+      if (freeUsed >= FREE_GENERATION_LIMIT) {
         return NextResponse.json({
           error: 'Free trial ended. Please subscribe to continue studying.',
           requiresSubscription: true
@@ -118,81 +108,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prompt for OpenAI - system prompt and user prompt
-    // system prompt - Set the behavior and rule of the model
-    const mcqSystemPrompt = `You are an expert educational assistant that creates high-quality multiple-choice study questions.
-
-Your questions should:
-- Test understanding, not just memorization
-- Be clear and unambiguous
-- Have exactly 4 options labeled A through D
-- Include helpful explanations
-
-Always respond with valid JSON in this exact structure:
-{
-  "questions": [
-    {
-      "id": 1,
-      "question": "The question text here?",
-      "options": ["A) First option", "B) Second option", "C) Third option", "D) Fourth option"],
-      "correctAnswer": "A",
-      "explanation": "Brief explanation of why this answer is correct"
-    }
-  ]
-}`;
-
-    const simpleCardSystemPrompt = `You are an expert educational assistant that creates simple, memorable flashcards for spaced repetition learning (like Anki).
-
-Your cards should:
-- Have SHORT answers (1-3 words or a brief phrase)
-- Use fill-in-the-blank style when possible
-- Be easy to recall
-- Focus on key facts and concepts
-- Avoid complex explanations in the answer
-
-Always respond with valid JSON in this exact structure:
-{
-  "cards": [
-    {
-      "id": 1,
-      "question": "The capital of France is ______",
-      "answer": "Paris",
-      "hint": "Optional hint if needed"
-    }
-  ]
-}`;
-
-    let userPrompt = ""; // User Prompt - The specific task with their data
+    // Prompt for OpenAI - system prompt and user prompt (user prompt is the specific task with their data.  system prompt - Set the behavior and rule of the model)
+    let userPrompt = ""; 
     let systemPrompt = "";
 
     if (questionType === 'mcq') {
       systemPrompt = mcqSystemPrompt;
-      userPrompt = `Generate ${numberOfQuestions} multiple-choice question based on these study notes:
-        
-${notes}
-
-Remember to format your response as valid JSON with the structure I specified.`;
+      userPrompt = buildMCQUserPrompt(notes, numberOfQuestions);
     }
 
-    if (questionType === 'simple') {
-      systemPrompt = simpleCardSystemPrompt;
-      userPrompt = `Generate ${numberOfQuestions} simple flashcard questions based on these study notes:
-${notes}
-
-
-Make them concise and easy to remember. Use fill-in-the-blank style when appropriate.
-Remeber to format your response as valid JSON with the structure I specified.`;
-    }
-
-    if (questionType === 'both') {
-      // for 'both' we need to two API calls or a comnined prompt
-      // Start w. simple approach: just do MCQ for now, expand later
-      systemPrompt = mcqSystemPrompt;
-      userPrompt = `Generate ${numberOfQuestions} multiple-choice question based on these study notes:
-        
-${notes}
-
-Remember to format your response as valid JSON with the structure I specified.`;
+    if (questionType === 'flashcard') {
+      systemPrompt = flashCardSystemPrompt;
+      userPrompt = buildFlashCardUserPrompt(notes, numberOfQuestions);
     }
 
     // Call OpenAI API
@@ -218,7 +145,7 @@ Remember to format your response as valid JSON with the structure I specified.`;
     try {
       const parsed = JSON.parse(responseContent);
 
-      if (questionType === 'simple') {
+      if (questionType === 'flashcard') {
         result = { cards: parsed.cards || parsed };
       } else {
         result = { questions: parsed.questions || parsed }; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
@@ -227,6 +154,7 @@ Remember to format your response as valid JSON with the structure I specified.`;
       console.error("JSON Parse Error Details:", parseError); // Technical details
       throw new Error("Invalid response format from OpenAI"); // High-level message caught by outer catch block
     }
+
     // Validate we got questions
     if (questionType === 'mcq') {
       if (result.questions.length === 0) {
@@ -264,7 +192,7 @@ Remember to format your response as valid JSON with the structure I specified.`;
     }
 
     // Validate cards
-    if (questionType === 'simple') {
+    if (questionType === 'flashcard') {
       if (result.cards.length === 0) {
         throw new Error("OpenAI returned no cards");;
       }

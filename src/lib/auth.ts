@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { ADMIN_EMAILS, FREE_GENERATION_LIMIT } from '@/lib/constants';
 
 /**
  * Sign up new user
@@ -44,11 +45,6 @@ const getCurrentUser = async () => {
  * Check if user is admin
  */
 const isAdmin = async (email: string) => {
-  const ADMIN_EMAILS = [
-    'gallegodimitry@gmail.com',
-    'khinethandrazaw1998.ktz@gmail.com'
-  ];
-
   return ADMIN_EMAILS.includes(email);
 };
 
@@ -101,9 +97,9 @@ const hasAccessToGenerate = async (userId: string, userEmail: string) => {
   // Subsribers have access
   if (await hasActiveSubscription(userId)) return true;
 
-  // Free tier: less than 2 generations used
+  // Free tier: less than 4 generations used
   const freeUsed = await getFreeGenerationsUsed(userId);
-  return freeUsed < 2;
+  return freeUsed < FREE_GENERATION_LIMIT;
 }
 
 export { signUp, signIn, signOut, getCurrentUser, isAdmin, hasActiveSubscription, getFreeGenerationsUsed, hasAccessToGenerate };
