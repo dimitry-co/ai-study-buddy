@@ -11,6 +11,7 @@ import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/li
 import { getCurrentUser, isAdmin, hasActiveSubscription, signOut, getFreeGenerationsUsed, hasAccessToGenerate } from '@/lib/auth';
 import { Question, FlashCard } from '@/types';
 import { FREE_GENERATION_LIMIT } from '@/lib/constants';
+import { ParsedContent } from '@/lib/fileParser';
 
 export default function Home() {
   const router = useRouter();
@@ -103,7 +104,7 @@ export default function Home() {
     router.push('/login');
   };
 
-  const generateQuestions = async (content: string) => {
+  const generateQuestions = async (content: ParsedContent) => {
     // Clear previous state (errors, questions)
     setError("");
     setQuestions([]);
@@ -117,7 +118,9 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          notes: content,
+          contentType: content.type,     // 'text' or 'images'
+          notes: content.text,           // text content (if text type)
+          images: content.images,        // text content (if text type)
           numberOfQuestions,
           questionType,
         }),

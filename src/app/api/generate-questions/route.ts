@@ -8,6 +8,8 @@ import {
   flashCardSystemPrompt,
   buildMCQUserPrompt,
   buildFlashCardUserPrompt,
+  buildMCQVisionPrompt,
+  buildFlashCardVisionPrompt,
 } from '@/lib/prompts';
 
 // Initialize OpenAI client with API key from env variables
@@ -15,9 +17,27 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Helper: Build Vision API content array
+const buildVisionContent = (images: string[], textPrompt: string): any[] => {
+  const content: any[] = [
+    { type: 'text', text: textPrompt }
+  ];
+
+  for (const image of images) {
+    content.push({
+      type: 'image_url',
+      image_url: {
+        url: image, // Already has "data:image/...;base64,..." format
+        detail: 'high' // high detail for better OCR (OCR = Optical Character Recognition. this helps with text recognition)
+      }
+    });
+  }
+
+  return content;
+}
+
 // POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
-
 
   // Get Next.js cookies (browser sent auth cookies with request)
   const cookieStore = await cookies();
@@ -60,9 +80,9 @@ export async function POST(request: NextRequest) {
       .from('subscriptions')
       .select('status, current_period_end')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false }) // order where the lastest subscription record is first
-      .limit(1) // get only the lastest subscription record
-      .single(); // return as single object (not an array)
+      .order('created_at', { ascending: false })  // order where the lastest subscription record is first
+      .limit(1)                                   // get only the lastest subscription record
+      .single();                                  // return as single object (not an array)
 
     // Check if active and not expired (is subscribed). (!! converts any value to boolean so null -> false)
     isSubscribed = !!(subscription && 
@@ -90,12 +110,24 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { notes, numberOfQuestions = 50, questionType = 'mcq' } = body;
+    const { 
+      contentType,       // 'text' or 'images'
+      notes,             // text content (if content type === 'text)
+      images,            // base64 images array (if content type === 'images')
+      numberOfQuestions = 50, 
+      questionType = 'mcq'
+    } = body;
 
-    // Validate input
-    if (!notes || notes.trim().length === 0) {
+    // Validate input - need either text or images
+    if (contentType === 'text' && (!notes || notes.trim().length === 0)) {
       return NextResponse.json(
         { error: "Notes are required" },
+        { status: 400 },
+      );
+    }
+    if (contentType === 'images' && (!images || images.length === 0)) {
+      return NextResponse.json(
+        { error: "Images are required" },
         { status: 400 },
       );
     }
@@ -108,27 +140,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prompt for OpenAI - system prompt and user prompt (user prompt is the specific task with their data.  system prompt - Set the behavior and rule of the model)
-    let userPrompt = ""; 
+    // Build prompts for OpenAI based on question type and content type. (Prompts for OpenAI - system prompt and user prompt (user prompt is the specific task with their data.  system prompt - Set the behavior and rule of the model))
     let systemPrompt = "";
+    let userContent: any; // Can be string or array of objects ( for Vision API)
 
     if (questionType === 'mcq') {
       systemPrompt = mcqSystemPrompt;
-      userPrompt = buildMCQUserPrompt(notes, numberOfQuestions);
+
+      if (contentType == 'images') {
+        // Vision API - send images with prompt. (build content array with images and text prompt)
+        userContent = buildVisionContent(images, buildMCQVisionPrompt(numberOfQuestions));
+      } else {
+        // Text only - regular prompt
+        userContent = buildMCQUserPrompt(notes, numberOfQuestions);
+      }
     }
 
     if (questionType === 'flashcard') {
       systemPrompt = flashCardSystemPrompt;
-      userPrompt = buildFlashCardUserPrompt(notes, numberOfQuestions);
+
+      if (contentType === 'images') {
+        userContent = buildVisionContent(images, buildFlashCardVisionPrompt(numberOfQuestions));
+      } else {
+        userContent = buildFlashCardUserPrompt(notes, numberOfQuestions);
+      }
     }
 
-    // Call OpenAI API
-    console.log("Calling OpenAI API...");
+    // Call OpenAI API (works for both text and vision)
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: userContent },
       ],
       temperature: 0.7,
       response_format: { type: "json_object" },

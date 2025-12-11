@@ -1,34 +1,33 @@
 import { useState } from 'react';
-import { validateFile, extractTextFromFile } from '@/lib/fileParser';
+import { validateFile, parseFile, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
 
 interface InputSectionProps {
   numberOfQuestions: number;
   setNumberOfQuestions: (num: number) => void;
   questionType: 'mcq' | 'flashcard';
   setQuestionType: (type: 'mcq' | 'flashcard') => void;
-  onGenerate: (content: string) => void;
+  onGenerate: (content: ParsedContent) => void;
   loading: boolean;
   setLoading: (loading: boolean) => void;
   setError: (error: string) => void;
 }
 
 const InputSection = (props: InputSectionProps) => {
-  // Local State - only this component needs to know about it.
   const [inputMode, setInputMode] = useState<'text' | 'file'>('file')
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Handle the generate button click - prepaer content for the API call and send up to parent for processing.
+  // Handle the generate button click - prepare content for the API call and send up to parent for processing.
   const handleGenerateClick = async () => {
-    let contentToSend = '';
-
     // Handle text mode input
     if (inputMode === 'text') {
       if (!notes.trim()) {
         props.setError("Please enter some notes");
         return;
       }
-      contentToSend = notes
+      // Text mode - send tas textt type and text to parent for processing.
+      props.onGenerate({ type: 'text', text: notes });
+      return;
     }
 
     // Handle file mode input
@@ -44,20 +43,18 @@ const InputSection = (props: InputSectionProps) => {
         props.setError(validation.error || "Invalid file.");
         return;
       }
-      // 2. Extract text from file
+      // 2. Parse file (extract text or convert to images)
       try {
         props.setLoading(true);
-        contentToSend = await extractTextFromFile(selectedFile);
+        const parsedContent = await parseFile(selectedFile);
+        props.onGenerate(parsedContent); // send content to parent for processing.
       } catch (err: any) {
         props.setError(err.message || "Failed to parse file.");
         props.setLoading(false);
-        return;
       }
     }
-    
-    props.onGenerate(contentToSend); // send content to parent for processing.
-  }
-  
+  };
+
   return (
     <div className="bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
       <div className="mb-6">
@@ -65,27 +62,25 @@ const InputSection = (props: InputSectionProps) => {
           htmlFor="notes"
           className="block text-sm font-medium text-gray-300 mb-2"
         >
-          Upload Notes (PDF, PowerPoint, or Text)
+          Upload Notes (PDF, Images, or Text)
         </label>
 
         {/* Input Method Selection Buttons */}
         <div className="flex gap-4 mb-6">
           <button
             onClick={() => setInputMode('file')}
-            className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${
-              inputMode === 'file'
-                ? 'bg-white text-gray-900'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'file'
+              ? 'bg-white text-gray-900'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
           >
             Upload File
           </button>
           <button
             onClick={() => setInputMode('text')}
-            className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${
-              inputMode === 'text'
-                ? 'bg-white text-gray-900'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'text'
+              ? 'bg-white text-gray-900'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
           >
             Text
@@ -110,8 +105,8 @@ const InputSection = (props: InputSectionProps) => {
           >
             <input
               id="file-upload"
-              type='file'
-              accept='.pdf,.txt'
+              type="file"
+              accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.gif,.webp,image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setSelectedFile(file);
@@ -119,13 +114,19 @@ const InputSection = (props: InputSectionProps) => {
               className="hidden"
             />
             <div className="text-gray-400">
-              <p className="mt-4">Click to browse files or drag and drop here</p>
-
+              <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p>Click to browse or drag and drop</p>
+              <p className="text-sm mt-2 text-gray-500">PDF, Images (JPG, PNG), or Text files</p>
             </div>
             {selectedFile && (
-              <p className="text-blue-400 mt-2">
-                Selected: {selectedFile.name}
-              </p>
+              <div className="mt-4 p-3 bg-gray-700 rounded-lg inline-block">
+                <p className="text-blue-400 font-medium">{selectedFile.name}</p>
+                <p className="text-gray-400 text-sm">
+                  {getFileTypeLabel(selectedFile)} • {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
             )}
           </label>
         )}

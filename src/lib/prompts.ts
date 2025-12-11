@@ -55,4 +55,37 @@ ${notes}
 Make them concise and easy to remember. Use fill-in-the-blank style when appropriate.
 Remeber to format your response as valid JSON with the structure I specified.`;
 
-export { mcqSystemPrompt, flashCardSystemPrompt, buildMCQUserPrompt, buildFlashCardUserPrompt };
+// Vision-based user prompts (for images)
+const buildMCQVisionPrompt = (numberOfQuestions: number) => 
+  `Look at the attached image(s) of study notes/materials and generate ${numberOfQuestions} multiple-choice questions based on ALL the content you can see.
+
+Analyze everything in the images including:
+- Text and written content
+- Diagrams and charts
+- Tables and figures
+- Any visual information
+
+Create questions that test understanding of this material.
+Remember to format your response as valid JSON with the structure I specified in my system message.`;
+
+const buildFlashCardVisionPrompt = (numberOfQuestions: number) => 
+  `Look at the attached image(s) of study notes/materials and generate ${numberOfQuestions} simple flashcard questions based on ALL the content you can see.
+
+Analyze everything in the images including:
+- Text and written content
+- Diagrams and charts
+- Tables and figures
+- Any visual information
+
+Make the cards concise and easy to remember. Use fill-in-the-blank style when appropriate.
+Remember to format your response as valid JSON with the structure I specified in my system message.`;
+
+
+export { 
+  mcqSystemPrompt, 
+  flashCardSystemPrompt, 
+  buildMCQUserPrompt, 
+  buildFlashCardUserPrompt, 
+  buildMCQVisionPrompt, 
+  buildFlashCardVisionPrompt 
+};
