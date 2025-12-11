@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { validateFile, parseFile, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
+import { MAX_QUESTIONS, MIN_QUESTIONS } from '@/lib/constants';
 
 interface InputSectionProps {
   numberOfQuestions: number;
@@ -138,15 +139,26 @@ const InputSection = (props: InputSectionProps) => {
           htmlFor="numQuestions"
           className="block text-sm font-medium text-gray-300 mb-2"
         >
-          Number of Questions
+          Number of Questions (Max {MAX_QUESTIONS})
         </label>
         <input
           id="numQuestions"
           type="number"
           value={props.numberOfQuestions}
-          onChange={(e) => props.setNumberOfQuestions(parseInt(e.target.value))}
-          min="1"
-          max="100"
+          onChange={(e) => {
+            // Allow typing freely, just update the value
+            const value = parseInt(e.target.value);
+            if (!isNaN(value)) {
+              props.setNumberOfQuestions(value);
+            }
+          }}
+          onBlur={(e) => {
+            // Clamp to valid range when user leaves the input
+            const value = parseInt(e.target.value) || MIN_QUESTIONS;
+            props.setNumberOfQuestions(Math.min(Math.max(value, MIN_QUESTIONS), MAX_QUESTIONS));
+          }}
+          min={MIN_QUESTIONS}
+          max={MAX_QUESTIONS}
           className="w-32 p-2 border border-gray-700 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>

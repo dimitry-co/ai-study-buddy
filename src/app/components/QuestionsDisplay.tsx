@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import QuestionCard from './QuestionCard';
+import QuestionsExportOptions from './QuestionsExportOptions';
 import { Question } from '@/types';
 
 interface QuestionsDisplayProps {
@@ -50,25 +51,29 @@ const QuestionsDisplay = (props: QuestionsDisplayProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <h2 className="text-2xl font-bold text-white">
           {props.questions.length} Questions
         </h2>
-        <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
-          Score: {score} / {props.questions.length}
+        
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+            Score: {score} / {props.questions.length}
+          </div>
+          <button
+            onClick={showAnswersAndScore}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+          >
+            Show Answers
+          </button>
+          <button
+            onClick={props.onDownloadAnki}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+          >
+            Anki Deck
+          </button>
+          <QuestionsExportOptions questions={props.questions} />
         </div>
-        <button
-          onClick={showAnswersAndScore}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
-        >
-          Show Answers and Score
-        </button>
-        <button
-          onClick={props.onDownloadAnki}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
-        >
-          Download MCQ Anki Deck
-        </button>
       </div>
 
       {props.questions.map((q, index) => (

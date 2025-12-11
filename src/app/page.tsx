@@ -7,7 +7,7 @@ import Header from '@/app/components/Header';
 import InputSection from '@/app/components/InputSection';
 import QuestionsDisplay from '@/app/components/QuestionsDisplay';
 import FlashCardsDisplay from '@/app/components/FlashCardsDisplay';
-import { exportMCQToAnki, exportSimpleCardsToAnki, downloadAnkiDeck } from '@/lib/ankiExport';
+import { exportMCQToAnki, exportFlashCardsToAnki, downloadAnkiDeck } from '@/lib/exportUtils';
 import { getCurrentUser, isAdmin, hasActiveSubscription, signOut, getFreeGenerationsUsed, hasAccessToGenerate } from '@/lib/auth';
 import { Question, FlashCard } from '@/types';
 import { FREE_GENERATION_LIMIT } from '@/lib/constants';
@@ -90,7 +90,7 @@ export default function Home() {
       tsvContent = exportMCQToAnki(questions);
       fileName = "mcq-anki-deck";
     } else if (questionType === 'flashcard' && flashcards.length > 0) {
-      tsvContent = exportSimpleCardsToAnki(flashcards);
+      tsvContent = exportFlashCardsToAnki(flashcards);
       fileName = "flashcard-anki-deck";
     } else {
       setError("No questions to export");

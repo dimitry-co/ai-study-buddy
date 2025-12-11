@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import FlashCard from './FlashCard';
+import FlashCardExportOptions from './FlashCardExportOptions';
 import { FlashCard as FlashCardType } from '@/types';
 
 interface FlashCardsDisplayProps {
@@ -20,15 +21,18 @@ const FlashCardsDisplay = (props: FlashCardsDisplayProps) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-white mb-4">
+        <h2 className="text-2xl font-bold text-white">
           {props.flashcards.length} Flashcards
         </h2>
-        <button
-          onClick={props.onDownloadAnki}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
-        >
-          Download Anki Deck
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={props.onDownloadAnki}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer"
+          >
+            Anki Deck
+          </button>
+          <FlashCardExportOptions flashcards={props.flashcards} />
+        </div>
       </div>
       {props.flashcards.map((card, index) => (
         <FlashCard

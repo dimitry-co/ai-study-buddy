@@ -50,14 +50,21 @@ const parseFile = async (file: File): Promise<ParsedContent> => {
 
 /**
  * Convert any file to base64 data URL (its a string that represents the file in base64 format)
+ * Uses async/await with arrayBuffer instead of callback-based FileReader
  */
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader(); // FileReader is a built-in object that allows you to read the contents of a file.
-    reader.onload = () => resolve(reader.result as string); // reader.result is the result of the file read. its a string. reader.onload is a function that is called when the file is read. 
-    reader.onerror = () => reject(new Error('Failed to read file.')); //
-    reader.readAsDataURL(file); // Returns "data:image/jpeg;base64,..."
-  });
+const fileToBase64 = async (file: File): Promise<string> => {
+  const arrayBuffer = await file.arrayBuffer(); // Read file as binary data (1s and 0s)
+  const bytes = new Uint8Array(arrayBuffer); // Converts to an array of numbers (0-255), where each number is one byte
+  
+  // Convert bytes to binary string
+  let binary = '';
+  bytes.forEach(byte => binary += String.fromCharCode(byte));
+  
+  // Encode to base64 and build data URL
+  const base64 = btoa(binary);
+  const mimeType = file.type || 'application/octet-stream';
+  
+  return `data:${mimeType};base64,${base64}`; // Wrap it as a data URL that the OpenAI API understands
 };
 
 

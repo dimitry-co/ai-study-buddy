@@ -167,6 +167,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Call OpenAI API (works for both text and vision)
+    // max_tokens scales with number of questions to prevent response cutoff
+    // ~150 tokens per MCQ, ~80 tokens per flashcard, plus buffer
+    const estimatedTokensNeeded = questionType === 'mcq' 
+      ? numberOfQuestions * 200 + 500  // MCQ: ~200 tokens each + buffer
+      : numberOfQuestions * 100 + 500; // Flashcard: ~100 tokens each + buffer
+    
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -174,8 +180,19 @@ export async function POST(request: NextRequest) {
         { role: "user", content: userContent },
       ],
       temperature: 0.7,
+      max_tokens: Math.min(estimatedTokensNeeded, 16000), // gpt-4o-mini max output is 16,384
       response_format: { type: "json_object" },
     });
+    // Log token usage for debugging
+    console.log('=== OpenAI Token Usage ===');
+    console.log('Requested questions:', numberOfQuestions);
+    console.log('Max tokens allowed:', Math.min(estimatedTokensNeeded, 16000));
+    console.log('Prompt tokens:', completion.usage?.prompt_tokens);
+    console.log('Completion tokens:', completion.usage?.completion_tokens);
+    console.log('Total tokens:', completion.usage?.total_tokens);
+    console.log('Finish reason:', completion.choices[0]?.finish_reason); // 'stop' = complete, 'length' = cut off!
+    console.log('==========================');
+
     // Extract the generated questions from OpenAI response
     const responseContent = completion.choices[0]?.message?.content;
 
@@ -197,6 +214,9 @@ export async function POST(request: NextRequest) {
       console.error("JSON Parse Error Details:", parseError); // Technical details
       throw new Error("Invalid response format from OpenAI"); // High-level message caught by outer catch block
     }
+
+    // Log how many questions we actually got
+    console.log('Questions received:', questionType === 'mcq' ? result.questions?.length : result.cards?.length);
 
     // Validate we got questions
     if (questionType === 'mcq') {
