@@ -9,7 +9,7 @@ const FREE_GENERATION_LIMIT = 4;
 
 // Question generation limits
 const MAX_QUESTIONS = 60;  // Keeps API response time reasonable (~30 seconds)
-const MIN_QUESTIONS = 5;
+const MIN_QUESTIONS = 0;
 
 // File size limits (in bytes)
 const MAX_FILE_SIZE_MB = 20;
