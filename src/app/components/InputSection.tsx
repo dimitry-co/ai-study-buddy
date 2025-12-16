@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { validateFile, parseFile, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
 import { MAX_QUESTIONS, MIN_QUESTIONS } from '@/lib/constants';
 
@@ -17,6 +17,12 @@ const InputSection = (props: InputSectionProps) => {
   const [inputMode, setInputMode] = useState<'text' | 'file'>('file')
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [questionInput, setQuestionInput] = useState<string>(String(props.numberOfQuestions));
+
+  // Keep local input in sync if parent changes the number (e.g., clamped)
+  useEffect(() => {
+    setQuestionInput(String(props.numberOfQuestions));
+  }, [props.numberOfQuestions]);
 
   // Handle the generate button click - prepare content for the API call and send up to parent for processing.
   const handleGenerateClick = async () => {
@@ -144,21 +150,21 @@ const InputSection = (props: InputSectionProps) => {
         <input
           id="numQuestions"
           type="number"
-          value={props.numberOfQuestions}
+          value={questionInput}
           onChange={(e) => {
-            // Allow typing freely, just update the value
-            const value = parseInt(e.target.value);
-            if (!isNaN(value)) {
-              props.setNumberOfQuestions(value);
-            }
+            // Let the user type freely (including clearing the field)
+            setQuestionInput(e.target.value);
           }}
-          onBlur={(e) => {
-            // Clamp to valid range when user leaves the input
-            const value = parseInt(e.target.value) || MIN_QUESTIONS;
-            props.setNumberOfQuestions(Math.min(Math.max(value, MIN_QUESTIONS), MAX_QUESTIONS));
+          onBlur={() => {
+            // Clamp to valid range on blur
+            const parsed = parseInt(questionInput);
+            const clamped = Math.min(
+              Math.max(isNaN(parsed) ? MIN_QUESTIONS : parsed, MIN_QUESTIONS),
+              MAX_QUESTIONS
+            );
+            props.setNumberOfQuestions(clamped);
+            setQuestionInput(String(clamped));
           }}
-          min={MIN_QUESTIONS}
-          max={MAX_QUESTIONS}
           className="w-32 p-2 border border-gray-700 bg-gray-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
