@@ -23,6 +23,9 @@ const SUPPORTED_PDF_TYPES = ['application/pdf'];
 // Max pages to process from PDF (cost control)
 const MAX_PDF_PAGES = 15;
 
+// Max number of files that can be uploaded at once
+const MAX_FILES = 10;
+
 export { 
   ADMIN_EMAILS, 
   FREE_GENERATION_LIMIT,
@@ -33,5 +36,6 @@ export {
   SUPPORTED_IMAGE_TYPES, 
   SUPPORTED_TEXT_TYPES, 
   SUPPORTED_PDF_TYPES, 
-  MAX_PDF_PAGES 
+  MAX_PDF_PAGES,
+  MAX_FILES
 };

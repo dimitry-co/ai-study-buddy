@@ -80,6 +80,26 @@ Analyze everything in the images including:
 Make the cards concise and easy to remember. Use fill-in-the-blank style when appropriate.
 Remember to format your response as valid JSON with the structure I specified in my system message.`;
 
+// Vision prompt when we have IMAGES + extra TEXT (MCQ)
+const buildMCQVisionPromptWithText = (numberOfQuestions: number, textContent: string) =>
+  `Look at the attached image(s) of study notes/materials AND ALSO use the following additional text notes to generate ${numberOfQuestions} multiple-choice questions based on ALL the content:
+
+${textContent}
+
+The images and the text notes are part of the same study material. Use both together when deciding what to ask about.
+
+Remember to format your response as valid JSON with the structure I specified in my system message.`;
+
+// Vision prompt when we have IMAGES + extra TEXT (flashcards)
+const buildFlashCardVisionPromptWithText = (numberOfQuestions: number, textContent: string) =>
+  `Look at the attached image(s) of study notes/materials AND ALSO use the following additional text notes to generate ${numberOfQuestions} simple flashcard questions based on ALL the content:
+
+${textContent}
+
+The images and the text notes are part of the same study material. Use both together when deciding what to ask about.
+
+Make the cards concise and easy to remember. Use fill-in-the-blank style when appropriate.
+Remember to format your response as valid JSON with the structure I specified in my system message.`;
 
 export { 
   mcqSystemPrompt, 
@@ -87,5 +107,7 @@ export {
   buildMCQUserPrompt, 
   buildFlashCardUserPrompt, 
   buildMCQVisionPrompt, 
-  buildFlashCardVisionPrompt 
+  buildFlashCardVisionPrompt,
+  buildMCQVisionPromptWithText,
+  buildFlashCardVisionPromptWithText
 };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { validateFile, parseFile, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
-import { MAX_QUESTIONS, MIN_QUESTIONS } from '@/lib/constants';
+import { validateFile, parseFiles, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
+import { MAX_QUESTIONS, MIN_QUESTIONS, MAX_FILES } from '@/lib/constants';
 
 interface InputSectionProps {
   numberOfQuestions: number;
@@ -16,7 +16,7 @@ interface InputSectionProps {
 const InputSection = (props: InputSectionProps) => {
   const [inputMode, setInputMode] = useState<'text' | 'file'>('file')
   const [notes, setNotes] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [questionInput, setQuestionInput] = useState<string>(String(props.numberOfQuestions));
 
   // Keep local input in sync if parent changes the number (e.g., clamped)
@@ -39,24 +39,26 @@ const InputSection = (props: InputSectionProps) => {
 
     // Handle file mode input
     if (inputMode === 'file') {
-      if (!selectedFile) {
-        props.setError("Please select a file");
+      if (selectedFiles.length === 0) {
+        props.setError("Please select at least one file");
         return;
       }
 
-      // 1. Validate file
-      const validation = validateFile(selectedFile);
-      if (!validation.valid) {
-        props.setError(validation.error || "Invalid file.");
-        return;
+      // 1. Validate all files
+      for (const file of selectedFiles) {
+        const validation = validateFile(file);
+        if (!validation.valid) {
+          props.setError(validation.error || `Invalid file: ${file.name}`);
+          return;
+        }
       }
-      // 2. Parse file (extract text or convert to images)
+      // 2. Parse all files (extract text or convert to images)
       try {
         props.setLoading(true);
-        const parsedContent = await parseFile(selectedFile);
+        const parsedContent = await parseFiles(selectedFiles);
         props.onGenerate(parsedContent); // send content to parent for processing.
       } catch (err: any) {
-        props.setError(err.message || "Failed to parse file.");
+        props.setError(err.message || "Failed to parse files.");
         props.setLoading(false);
       }
     }
@@ -84,7 +86,10 @@ const InputSection = (props: InputSectionProps) => {
             Upload File
           </button>
           <button
-            onClick={() => setInputMode('text')}
+            onClick={() => {
+              setInputMode('text');
+              setSelectedFiles([]); // Clear files when switching to text mode
+            }}
             className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'text'
               ? 'bg-white text-gray-900'
               : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -113,26 +118,55 @@ const InputSection = (props: InputSectionProps) => {
             <input
               id="file-upload"
               type="file"
+              multiple
               accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.gif,.webp,image/*"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) setSelectedFile(file);
+                const files = Array.from(e.target.files || []);
+                if (files.length > MAX_FILES) {
+                  props.setError(`Maximum ${MAX_FILES} files allowed`);
+                  return;
+                }
+                setSelectedFiles(files);
               }}
               className="hidden"
             />
-            <div className="text-gray-400">
-              <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <p>Click to browse or drag and drop</p>
-              <p className="text-sm mt-2 text-gray-500">PDF, Images (JPG, PNG), or Text files</p>
-            </div>
-            {selectedFile && (
-              <div className="mt-4 p-3 bg-gray-700 rounded-lg inline-block">
-                <p className="text-blue-400 font-medium">{selectedFile.name}</p>
-                <p className="text-gray-400 text-sm">
-                  {getFileTypeLabel(selectedFile)} • {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+            {selectedFiles.length === 0 && (
+              <div className="text-gray-400">
+                <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p>Click to browse or drag and drop</p>
+                <p className="text-sm mt-2 text-gray-500">PDF, Images (JPG, PNG), or Text files</p>
+              </div>
+            )}
+            {selectedFiles.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm text-gray-400 mb-2">
+                  {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected
                 </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index} className="p-3 bg-gray-700 rounded-lg flex items-center justify-between">
+                      <div className="flex-1"> 
+                        <p className="text-blue-400 font-medium">{file.name}</p>
+                        <p className="text-gray-400 text-sm">
+                          {getFileTypeLabel(file)} • {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedFiles(selectedFiles.filter((_, i) => i !== index))
+                        }}
+                        className="ml-4 text-gray-400 hover:text-red-800 transition-colors cursor-pointer"
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </label>
@@ -191,7 +225,7 @@ const InputSection = (props: InputSectionProps) => {
       <div className="flex justify-center">
         <button
           onClick={handleGenerateClick}
-          disabled={props.loading || (inputMode === 'text' ? !notes.trim() : !selectedFile)}
+          disabled={props.loading || (inputMode === 'text' ? !notes.trim() : selectedFiles.length === 0)}
           className="w-full max-w-sm bg-white hover:bg-gray-200 active:bg-gray-300 cursor-pointer disabled:bg-gray-500 disabled:cursor-not-allowed disabled:hover:bg-gray-500 text-gray-900 font-semibold py-3 rounded-3xl transition-colors"
         >
           {props.loading ? "Generating Questions..." : "Generate Questions"}
@@ -202,3 +236,9 @@ const InputSection = (props: InputSectionProps) => {
 };
 
 export default InputSection;
+
+
+// Questions
+// 1 - explain the classnames css for the uploaded file user wants to genreate questions with. 
+//     Also the svg icons used for the remove button.
+// 2 - explain disabled logic on generate button.

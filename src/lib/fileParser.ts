@@ -10,7 +10,8 @@ import {
   SUPPORTED_IMAGE_TYPES,
   SUPPORTED_TEXT_TYPES,
   SUPPORTED_PDF_TYPES,
-  MAX_PDF_PAGES
+  MAX_PDF_PAGES,
+  MAX_FILES
 } from '@/lib/constants';
 
 // Return type for parsed content
@@ -46,6 +47,56 @@ const parseFile = async (file: File): Promise<ParsedContent> => {
   }
 
   throw new Error('Unsupported file type.');
+};
+
+/**
+ * Parse multiple files = combines images and text from all file
+ * If both images and text are present, return images type with text included.
+ */
+const parseFiles = async (files: File[]): Promise<ParsedContent> => {
+  if (files.length === 0) {
+    throw new Error('No files provided.');
+  }
+  if (files.length > MAX_FILES) {
+    throw new Error(`Maximum ${MAX_FILES} files allowed`);
+  }
+
+  const allImages: string[] = [];
+  const allTexts: string[] = [];
+
+  // Process each file
+  for (const file of files) {
+    const parsed = await parseFile(file);
+
+    // Collect all images (from PDFs and images)
+    if (parsed.type === 'images' && parsed.images) {
+      allImages.push(...parsed.images);
+    }
+    else if (parsed.type === 'text' && parsed.text) {
+      allTexts.push(parsed.text);
+    }
+  }
+
+
+  // If we have images (even if we also have text), use Vision API
+  // The text will be included in the prompr along with images
+  if (allImages.length > 0) {
+    const combinedText = allTexts.length > 0 
+      ? allTexts.join('\n\n---\n\n') // Join multiple text files with separator
+      : undefined;
+    return {
+      type: 'images',
+      images: allImages,
+      text: combinedText // Include text if available
+    }
+  }
+
+  // Only text files = combine and return as text type
+  if (allTexts.length > 0) {
+    return { type: 'text', text: allTexts.join('\n\n---\n\n')}
+  }
+
+  throw new Error('No valid content extracted from files (text or images).');
 };
 
 /**
@@ -161,5 +212,5 @@ const getFileTypeLabel = (file: File): string => {
   return 'Unknown';
 };
 
-export { parseFile, validateFile, getFileTypeLabel };
+export { parseFile, parseFiles, validateFile, getFileTypeLabel };
 export type { ParsedContent };

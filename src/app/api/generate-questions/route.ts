@@ -10,6 +10,8 @@ import {
   buildFlashCardUserPrompt,
   buildMCQVisionPrompt,
   buildFlashCardVisionPrompt,
+  buildMCQVisionPromptWithText,
+  buildFlashCardVisionPromptWithText,
 } from '@/lib/prompts';
 
 // Initialize OpenAI client with API key from env variables
@@ -27,7 +29,7 @@ const buildVisionContent = (images: string[], textPrompt: string): any[] => {
     content.push({
       type: 'image_url',
       image_url: {
-        url: image, // Already has "data:image/...;base64,..." format
+        url: image, // Already has "data:image/...;base64,..." format from fileParser
         detail: 'high' // high detail for better OCR (OCR = Optical Character Recognition. this helps with text recognition)
       }
     });
@@ -142,14 +144,19 @@ export async function POST(request: NextRequest) {
 
     // Build prompts for OpenAI based on question type and content type. (Prompts for OpenAI - system prompt and user prompt (user prompt is the specific task with their data.  system prompt - Set the behavior and rule of the model))
     let systemPrompt = "";
-    let userContent: any; // Can be string or array of objects ( for Vision API)
+    let userContent: any; // string for text-only, array of objects for Vision API
 
     if (questionType === 'mcq') {
       systemPrompt = mcqSystemPrompt;
 
       if (contentType == 'images') {
-        // Vision API - send images with prompt. (build content array with images and text prompt)
-        userContent = buildVisionContent(images, buildMCQVisionPrompt(numberOfQuestions));
+        // Vision API - send images with prompt (with or without text). (build content array with images and text prompt)
+        const promptText = 
+          notes && notes.trim().length > 0
+            ? buildMCQVisionPromptWithText(numberOfQuestions, notes)      // images + text notes
+            : buildMCQVisionPrompt(numberOfQuestions);                    // images only
+
+        userContent = buildVisionContent(images, promptText);
       } else {
         // Text only - regular prompt
         userContent = buildMCQUserPrompt(notes, numberOfQuestions);
@@ -160,8 +167,14 @@ export async function POST(request: NextRequest) {
       systemPrompt = flashCardSystemPrompt;
 
       if (contentType === 'images') {
-        userContent = buildVisionContent(images, buildFlashCardVisionPrompt(numberOfQuestions));
+        const promptText =
+          notes && notes.trim().length > 0
+            ? buildFlashCardVisionPromptWithText(numberOfQuestions, notes)      // images + text notes
+            : buildFlashCardVisionPrompt(numberOfQuestions);                    // images only
+
+        userContent = buildVisionContent(images, promptText);  // array of objects
       } else {
+        // Text-only mode
         userContent = buildFlashCardUserPrompt(notes, numberOfQuestions);
       }
     }
