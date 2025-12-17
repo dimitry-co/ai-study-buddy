@@ -173,7 +173,7 @@ const generateQuizPDF = (pdf: jsPDF, questions: Question[], title: string) => {
 
   // Cover page
   pdf.setFontSize(24);
-  pdf.text(title, pdf.internal.pageSize.width / 2, 50, { align: 'center' });
+  pdf.text(title, pdf.internal.pageSize.width / 2, 50, { align: 'center' }); // the numbers
   pdf.setFontSize(14);
   pdf.text('Practice Quiz', pdf.internal.pageSize.width / 2, 65, { align: 'center' });
   pdf.setFontSize(12);
@@ -189,10 +189,10 @@ const generateQuizPDF = (pdf: jsPDF, questions: Question[], title: string) => {
   pdf.setFontSize(16);
   pdf.text('Questions', pdf.internal.pageSize.width / 2, yPosition, { align: 'center' });
   yPosition += 15;
-  pdf.setFontSize(12);
+  pdf.setFontSize(10);
 
   questions.forEach((q, index) => {
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageHeight - 40) {
       pdf.addPage();
       yPosition = 20;
     }
@@ -200,9 +200,9 @@ const generateQuizPDF = (pdf: jsPDF, questions: Question[], title: string) => {
     // Question
     pdf.setFont('helvetica', 'bold');
     const questionText = `${index + 1}. ${q.question}`;
-    const questionLines = pdf.splitTextToSize(questionText, 170);
-    pdf.text(questionLines, 20, yPosition);
-    yPosition += questionLines.length * 7;
+    const questionLines = pdf.splitTextToSize(questionText, 170); // this part lets the questions text wrap to the next line if it's too long. 
+    pdf.text(questionLines, 20, yPosition); // this part prints the questions text to the pdf.
+    yPosition += questionLines.length * 7; // Adds the height of the questions text to the yPosition.
 
     // Options
     pdf.setFont('helvetica', 'normal');
@@ -221,24 +221,30 @@ const generateQuizPDF = (pdf: jsPDF, questions: Question[], title: string) => {
   pdf.addPage();
   pdf.setFontSize(16);
   pdf.text('Answer Key', pdf.internal.pageSize.width / 2, 20, { align: 'center' });
-  yPosition = 40;
+  yPosition = 35;
 
   // Create answer key table
   const answerData = questions.map((q, index) => [
     `${index + 1}`,
     q.correctAnswer,
-    q.explanation.substring(0, 60) + (q.explanation.length > 60 ? '...' : '')
+    q.explanation,
   ]);
 
   autoTable(pdf, {
     head: [['Question', 'Answer', 'Explanation']],
     body: answerData,
     startY: yPosition,
-    styles: { fontSize: 10 },
+    theme: 'grid', // the grid them
+    styles: { 
+      fontSize: 9,
+      cellPadding: 2,
+      overflow: 'linebreak', // <- wraps text to the next line if it's too long.
+      valign: 'top', // <- aligns the text to the top of the cell.
+    },
     columnStyles: {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 20 },
-      2: { cellWidth: 130 }
+      0: { cellWidth: 18 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 139 }
     }
   });
 };
