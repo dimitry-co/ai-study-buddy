@@ -343,12 +343,50 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET handler for health check
+// GET handler for health check and Supabase keep-alive
 export async function GET() {
-  return NextResponse.json({
-    status: "Api route is working",
-    endpoint: "/api/generate-questions",
-    method: "POST",
-    description: "Generate study questions from notes using OpenAI",
-  });
+  try {
+    // Create Supabase client to ping Supabase and keep it active
+    // This doesn't require auth - just establishes a connection
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return [];
+          },
+          setAll() {
+            // No-op for keep-alive
+          },
+        },
+      }
+    );
+
+    // Simple query to ping Supabase and keep it active
+    // This is a lightweight query that doesn't require auth
+    const { error } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1);
+
+    // Even if it errors (no auth), the connection attempt keeps Supabase active
+    // The query itself doesn't matter - just pinging Supabase keeps it active
+    return NextResponse.json({
+      status: "Api route is working",
+      endpoint: "/api/generate-questions",
+      method: "POST",
+      description: "Generate study questions from notes using OpenAI",
+      supabase: "keep-alive pinged",
+    });
+  } catch (error) {
+    // Even if there's an error, Supabase was pinged, which is what we want
+    return NextResponse.json({
+      status: "Api route is working",
+      endpoint: "/api/generate-questions",
+      method: "POST",
+      description: "Generate study questions from notes using OpenAI",
+      supabase: "keep-alive pinged",
+    });
+  }
 }

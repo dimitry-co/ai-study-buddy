@@ -12,7 +12,6 @@ An AI-powered study tool that generates flashcards and multiple-choice questions
 - **Score Tracking** - See how you're doing with instant feedback
 
 ## Tech Stack
-
 - **Frontend**: Next.js 15, React, Tailwind CSS
 - **Backend**: Next.js API Routes
 - **AI**: OpenAI GPT-4o-mini
