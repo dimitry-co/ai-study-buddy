@@ -146,8 +146,14 @@ export default function Home() {
       } else {
         setError(data.error || "Failed to generate questions");
       }
-    } catch (error) {
-      setError("Network error, Please try again.");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        setError("Request timed out...")
+      } else if (error.message?.includes('413') || error.message?.includes('payload')) {
+        setError("Image too large. Please upload an image smaller than 3mb.")
+      } else {
+        setError("Network error, Please try again.");
+      }
     } finally {
       setLoading(false);
     }

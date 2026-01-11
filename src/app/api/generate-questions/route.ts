@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { ADMIN_EMAILS, FREE_GENERATION_LIMIT } from '@/lib/constants';
+import { ADMIN_EMAILS, FREE_GENERATION_LIMIT, MAX_QUESTIONS, MIN_QUESTIONS } from '@/lib/constants';
 import {
   mcqSystemPrompt,
   flashCardSystemPrompt,
@@ -120,6 +120,14 @@ export async function POST(request: NextRequest) {
       questionType = 'mcq'
     } = body;
 
+    // Validate numberOfQuestions (backend validation - never trust client input)
+    if (numberOfQuestions < MIN_QUESTIONS || numberOfQuestions > MAX_QUESTIONS) {
+      return NextResponse.json(
+        { error: `Number of questions must be between ${MIN_QUESTIONS} and ${MAX_QUESTIONS}` },
+        { status: 400 },
+      );
+    }
+
     // Validate input - need either text or images
     if (contentType === 'text' && (!notes || notes.trim().length === 0)) {
       return NextResponse.json(
@@ -230,6 +238,22 @@ export async function POST(request: NextRequest) {
 
     // Log how many questions we actually got
     console.log('Questions received:', questionType === 'mcq' ? result.questions?.length : result.cards?.length);
+
+    // Detect truncation - if OpenAI hit token limit and cut off response
+    const finishReason = completion.choices[0]?.finish_reason;
+    if (finishReason === 'length') {
+      console.error('⚠️ Response truncated due to token limit!');
+      const receivedCount = questionType === 'mcq' ? result.questions?.length : result.cards?.length;
+      return NextResponse.json(
+        { 
+          error: `Request exceeded token limit. Received ${receivedCount} of ${numberOfQuestions} questions. Try requesting fewer questions.`,
+          truncated: true,
+          received: receivedCount,
+          requested: numberOfQuestions
+        },
+        { status: 413 } // 413 Payload Too Large
+      );
+    }
 
     // Validate we got questions
     if (questionType === 'mcq') {
