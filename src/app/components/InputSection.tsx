@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { validateFile, parseFiles, getFileTypeLabel, ParsedContent } from '@/lib/fileParser';
-import { MAX_QUESTIONS, MIN_QUESTIONS, MAX_FILES } from '@/lib/constants';
+import { MAX_QUESTIONS, MIN_QUESTIONS, MAX_FILES, MAX_PDF_PAGES, MAX_FILE_SIZE_MB, MAX_IMAGES, MAX_IMAGE_FILES } from '@/lib/constants';
 
 interface InputSectionProps {
   numberOfQuestions: number;
@@ -52,7 +52,17 @@ const InputSection = (props: InputSectionProps) => {
           return;
         }
       }
-      // 2. Parse all files (extract text or convert to images)
+      
+      // 2. Check image file count (before parsing, PDFs excluded)
+      const imageFiles = selectedFiles.filter(f => 
+        f.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name)
+      );
+      if (imageFiles.length > MAX_IMAGE_FILES) {
+        props.setError(`Maximum ${MAX_IMAGE_FILES} image files allowed. PDFs can have up to ${MAX_PDF_PAGES} pages each.`);
+        return;
+      }
+      
+      // 3. Parse all files (extract text or convert to images)
       try {
         props.setLoading(true);
         const parsedContent = await parseFiles(selectedFiles);
@@ -170,6 +180,19 @@ const InputSection = (props: InputSectionProps) => {
               </div>
             )}
           </label>
+        )}
+        
+        {/* File Upload Limits Info */}
+        {inputMode === 'file' && (
+          <div className="mt-4 bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+            <p className="text-blue-300 text-sm font-medium mb-1">Upload Limits:</p>
+            <ul className="text-blue-200 text-xs space-y-1 ml-4">
+              <li>• Max {MAX_FILES} files per request</li>
+              <li>• Max {MAX_FILE_SIZE_MB} MB per file</li>
+              <li>• Images: Max {MAX_IMAGE_FILES} image files</li>
+              <li>• PDFs: Max {MAX_PDF_PAGES} pages per PDF</li>
+            </ul>
+          </div>
         )}
       </div>
 

@@ -126,6 +126,12 @@ export default function Home() {
         }),
       });
 
+      // Handle specific error status codes BEFORE parsing JSON
+      if (response.status === 413) {
+        setError("Files are too large. Try uploading fewer files or reducing image quality.");
+        return;
+      }
+
       const data = await response.json(); // We don't receive all the data at once, we receive it in chunks. so we need to wait for the data to be fully received. this line uses await, receives the data and parses it into a JavaScript object.
 
       if (response.ok) {
@@ -147,12 +153,14 @@ export default function Home() {
         setError(data.error || "Failed to generate questions");
       }
     } catch (error: any) {
+      // Catch network errors (request too large to send, CORS, etc.)
+      console.error("Fetch error:", error);
       if (error.name === 'AbortError') {
-        setError("Request timed out...")
-      } else if (error.message?.includes('413') || error.message?.includes('payload')) {
-        setError("Image too large. Please upload an image smaller than 3mb.")
+        setError("Request timed out. The server may be starting up. Please try again.");
+      } else if (error.message?.toLowerCase().includes('body') || error.message?.toLowerCase().includes('size')) {
+        setError("Files are too large. Try uploading fewer files or reducing image quality.");
       } else {
-        setError("Network error, Please try again.");
+        setError("Network error. Please try again.");
       }
     } finally {
       setLoading(false);

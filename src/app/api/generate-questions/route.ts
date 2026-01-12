@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { ADMIN_EMAILS, FREE_GENERATION_LIMIT, MAX_QUESTIONS, MIN_QUESTIONS } from '@/lib/constants';
+import { ADMIN_EMAILS, FREE_GENERATION_LIMIT, MAX_QUESTIONS, MIN_QUESTIONS, MAX_IMAGES, BATCH_THRESHOLD, NUM_BATCHES, BATCH_FOCUSES } from '@/lib/constants';
 import {
   mcqSystemPrompt,
   flashCardSystemPrompt,
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       contentType,       // 'text' or 'images'
       notes,             // text content (if content type === 'text)
       images,            // base64 images array (if content type === 'images')
-      numberOfQuestions = 50, 
+      numberOfQuestions = 30, 
       questionType = 'mcq'
     } = body;
 
@@ -141,6 +141,16 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    
+    // Validate total image count after parsing (prevent token overload)
+    // This includes both direct image uploads and PDF pages
+    // Each image can use 15K-40K tokens depending on size/complexity
+    if (contentType === 'images' && images.length > MAX_IMAGES) {
+      return NextResponse.json(
+        { error: `Too many images. Maximum ${MAX_IMAGES} total images allowed (from PDFs and image files combined). Try uploading fewer files or reducing PDF page count.` },
+        { status: 400 },
+      );
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       console.error("OpenAI API key is not configured");
@@ -150,109 +160,276 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build prompts for OpenAI based on question type and content type. (Prompts for OpenAI - system prompt and user prompt (user prompt is the specific task with their data.  system prompt - Set the behavior and rule of the model))
-    let systemPrompt = "";
-    let userContent: any; // string for text-only, array of objects for Vision API
+    // Set system prompt (same for all paths)
+    const systemPrompt = questionType === 'mcq' ? mcqSystemPrompt : flashCardSystemPrompt;
 
-    if (questionType === 'mcq') {
-      systemPrompt = mcqSystemPrompt;
-
-      if (contentType == 'images') {
-        // Vision API - send images with prompt (with or without text). (build content array with images and text prompt)
-        const promptText = 
-          notes && notes.trim().length > 0
-            ? buildMCQVisionPromptWithText(numberOfQuestions, notes)      // images + text notes
-            : buildMCQVisionPrompt(numberOfQuestions);                    // images only
-
-        userContent = buildVisionContent(images, promptText);
-      } else {
-        // Text only - regular prompt
-        userContent = buildMCQUserPrompt(notes, numberOfQuestions);
-      }
-    }
-
-    if (questionType === 'flashcard') {
-      systemPrompt = flashCardSystemPrompt;
-
-      if (contentType === 'images') {
-        const promptText =
-          notes && notes.trim().length > 0
-            ? buildFlashCardVisionPromptWithText(numberOfQuestions, notes)      // images + text notes
-            : buildFlashCardVisionPrompt(numberOfQuestions);                    // images only
-
-        userContent = buildVisionContent(images, promptText);  // array of objects
-      } else {
-        // Text-only mode
-        userContent = buildFlashCardUserPrompt(notes, numberOfQuestions);
-      }
-    }
-
-    // Call OpenAI API (works for both text and vision)
-    // max_tokens scales with number of questions to prevent response cutoff
-    // ~150 tokens per MCQ, ~80 tokens per flashcard, plus buffer
-    const estimatedTokensNeeded = questionType === 'mcq' 
-      ? numberOfQuestions * 200 + 500  // MCQ: ~200 tokens each + buffer
-      : numberOfQuestions * 100 + 500; // Flashcard: ~100 tokens each + buffer
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.7,
-      max_tokens: Math.min(estimatedTokensNeeded, 16000), // gpt-4o-mini max output is 16,384
-      response_format: { type: "json_object" },
-    });
-    // Log token usage for debugging
-    console.log('=== OpenAI Token Usage ===');
-    console.log('Requested questions:', numberOfQuestions);
-    console.log('Max tokens allowed:', Math.min(estimatedTokensNeeded, 16000));
-    console.log('Prompt tokens:', completion.usage?.prompt_tokens);
-    console.log('Completion tokens:', completion.usage?.completion_tokens);
-    console.log('Total tokens:', completion.usage?.total_tokens);
-    console.log('Finish reason:', completion.choices[0]?.finish_reason); // 'stop' = complete, 'length' = cut off!
-    console.log('==========================');
-
-    // Extract the generated questions from OpenAI response
-    const responseContent = completion.choices[0]?.message?.content;
-
-    if (!responseContent) {
-      throw new Error("No response from OpenAI");
-    }
-
-    // Parse the JSON response
+    // Decide whether to use batching or single request
     let result;
-    try {
-      const parsed = JSON.parse(responseContent);
-
-      if (questionType === 'flashcard') {
-        result = { cards: parsed.cards || parsed };
-      } else {
-        result = { questions: parsed.questions || parsed }; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
+    let totalTokensUsed = 0;
+    
+    if (numberOfQuestions >= BATCH_THRESHOLD) {
+      // ===== BATCHING MODE (10+ questions) =====
+      console.log(`Using batching: ${numberOfQuestions} questions split into ${NUM_BATCHES} batches`);
+      
+      // Warn if using many images (could cause token limit issues in batching)
+      if (contentType === 'images' && images && images.length > 10) {
+        console.warn(`Large image count (${images.length} images). Performance may be slower.`);
       }
-    } catch (parseError) {
-      console.error("JSON Parse Error Details:", parseError); // Technical details
-      throw new Error("Invalid response format from OpenAI"); // High-level message caught by outer catch block
-    }
+      
+      // Calculate balanced distribution across batches
+      const baseSize = Math.floor(numberOfQuestions / NUM_BATCHES);
+      const remainder = numberOfQuestions % NUM_BATCHES;
+      
+      // Create parallel batch requests
+      const batchPromises = Array.from({ length: NUM_BATCHES }, (_, i) => {
+        // First 'remainder' batches get +1 extra question
+        const questionsInThisBatch = i < remainder ? baseSize + 1 : baseSize;
+        
+        // Add batch-specific focus to system prompt
+        const batchFocus = BATCH_FOCUSES[i];
+        const batchSystemPrompt = systemPrompt + `\n\nIMPORTANT: ${batchFocus.instruction}`;
+        
+        // Build user prompt with batch question count for this batch
+        let batchUserContent: any;
+        if (questionType === 'mcq') {
+          if (contentType === 'images') {
+            const promptText = 
+              notes && notes.trim().length > 0
+                ? buildMCQVisionPromptWithText(questionsInThisBatch, notes)  // Use batch count!
+                : buildMCQVisionPrompt(questionsInThisBatch);                 // Use batch count!
+            batchUserContent = buildVisionContent(images, promptText);
+          } else {
+            batchUserContent = buildMCQUserPrompt(notes, questionsInThisBatch); // Use batch count!
+          }
+        } else { // flashcard
+          if (contentType === 'images') {
+            const promptText =
+              notes && notes.trim().length > 0
+                ? buildFlashCardVisionPromptWithText(questionsInThisBatch, notes)  // Use batch count!
+                : buildFlashCardVisionPrompt(questionsInThisBatch);                 // Use batch count!
+            batchUserContent = buildVisionContent(images, promptText);
+          } else {
+            batchUserContent = buildFlashCardUserPrompt(notes, questionsInThisBatch); // Use batch count!
+          }
+        }
+        
+        // Calculate max tokens for this batch with larger buffer for complex content
+        const estimatedTokensNeeded = questionType === 'mcq' 
+          ? questionsInThisBatch * 250 + 1000  // Increased buffer for complex PDFs
+          : questionsInThisBatch * 120 + 600;
+        
+        console.log(`  Batch ${i + 1} (${batchFocus.name}): ${questionsInThisBatch} questions, max_tokens: ${Math.min(estimatedTokensNeeded, 16000)}`);
+        
+        // Make OpenAI API call with batch-specific prompt
+        return openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: batchSystemPrompt },
+            { role: "user", content: batchUserContent }, // Batch-specific prompt!
+          ],
+          temperature: 0.8, // Higher temp for more diversity
+          max_tokens: Math.min(estimatedTokensNeeded, 16000),
+          response_format: { type: "json_object" },
+        });
+      });
+      
+      // Wait for all batches to complete in parallel
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Combine results from all batches
+      const allQuestions: any[] = [];
+      let totalPromptTokens = 0;
+      let totalCompletionTokens = 0;
+      
+      for (let i = 0; i < batchResults.length; i++) {
+        const completion = batchResults[i];
+        const finishReason = completion.choices[0]?.finish_reason;
+        const batchCompletionTokens = completion.usage?.completion_tokens || 0;
+        const responseContent = completion.choices[0]?.message?.content; // Extract the response content from the completion
+        
+        // Check for truncation in this batch
+        if (finishReason === 'length') {
+          console.error(`Batch ${i + 1} truncated! Finish reason: length`);
+          return NextResponse.json(
+            { 
+              error: `Batch ${i + 1} exceeded token limit. The request is too large. Try requesting fewer questions or uploading smaller files.`,
+            },
+            { status: 413 }
+          );
+        }
+        
+        // Check for suspiciously low tokens in this batch
+        if (batchCompletionTokens < 50) {
+          console.error(`Batch ${i + 1} returned suspiciously low tokens: ${batchCompletionTokens}`);
+          return NextResponse.json(
+            { 
+              error: `Batch ${i + 1} failed to generate properly. The content may be too complex. Try reducing the number of questions.`,
+            },
+            { status: 422 }
+          );
+        }
+        
+        if (!responseContent) {
+          throw new Error(`Batch ${i + 1} returned no response`);
+        }
+        
+        // Parse this batch's results
+        try {
+          const parsed = JSON.parse(responseContent);
+          const batchQuestions = questionType === 'mcq' 
+            ? (parsed.questions || parsed)
+            : (parsed.cards || parsed);
+          
+          // Renumber IDs to be sequential across all batches
+          const renumbered = batchQuestions.map((q: any, idx: number) => ({
+            ...q,
+            id: allQuestions.length + idx + 1
+          }));
+          
+          allQuestions.push(...renumbered);
+        } catch (parseError) {
+          console.error(`Batch ${i + 1} parse error:`, parseError);
+          console.error(`Batch ${i + 1} response preview:`, responseContent?.substring(0, 200));
+          return NextResponse.json(
+            { 
+              error: `Batch ${i + 1} returned invalid response. The content may be too complex or the request too large. Try requesting fewer questions.`,
+            },
+            { status: 500 }
+          );
+        }
+        
+        // Accumulate token usage
+        totalPromptTokens += completion.usage?.prompt_tokens || 0;
+        totalCompletionTokens += batchCompletionTokens;
+      }
+      
+      // Log combined token usage
+      totalTokensUsed = totalPromptTokens + totalCompletionTokens;
+      console.log('=== Batched OpenAI Token Usage ===');
+      console.log('Requested questions:', numberOfQuestions);
+      console.log('Total batches:', NUM_BATCHES);
+      console.log('Total prompt tokens:', totalPromptTokens);
+      console.log('Total completion(output) tokens:', totalCompletionTokens);
+      console.log('Total tokens:', totalTokensUsed);
+      console.log('Questions received:', allQuestions.length);
+      console.log('==================================');
+      
+      // Trim to exact number requested (in case we got extras)
+      const trimmedQuestions = allQuestions.slice(0, numberOfQuestions);
+      
+      // Set result based on question type
+      if (questionType === 'mcq') {
+        result = { questions: trimmedQuestions };
+      } else {
+        result = { cards: trimmedQuestions };
+      }
+      
+    } else {
+      // ===== SINGLE REQUEST MODE (<10 questions) =====
+      console.log(`📝 Using single request: ${numberOfQuestions} questions`);
+      
+      // Build prompts for single request (batching builds its own)
+      let userContent: any;
+      if (questionType === 'mcq') {
+        if (contentType === 'images') {
+          const promptText = 
+            notes && notes.trim().length > 0
+              ? buildMCQVisionPromptWithText(numberOfQuestions, notes)
+              : buildMCQVisionPrompt(numberOfQuestions);
+          userContent = buildVisionContent(images, promptText);
+        } else {
+          userContent = buildMCQUserPrompt(notes, numberOfQuestions);
+        }
+      } else { // flashcard
+        if (contentType === 'images') {
+          const promptText =
+            notes && notes.trim().length > 0
+              ? buildFlashCardVisionPromptWithText(numberOfQuestions, notes)
+              : buildFlashCardVisionPrompt(numberOfQuestions);
+          userContent = buildVisionContent(images, promptText);
+        } else {
+          userContent = buildFlashCardUserPrompt(notes, numberOfQuestions);
+        }
+      }
+      
+      // max_tokens scales with number of questions to prevent response cutoff
+      const estimatedTokensNeeded = questionType === 'mcq' 
+        ? numberOfQuestions * 200 + 500  // MCQ: ~200 tokens each + buffer
+        : numberOfQuestions * 100 + 500; // Flashcard: ~100 tokens each + buffer
+      
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.7,
+        max_tokens: Math.min(estimatedTokensNeeded, 16000),
+        response_format: { type: "json_object" },
+      });
+      
+      // Log token usage
+      totalTokensUsed = completion.usage?.total_tokens || 0;
+      console.log('=== OpenAI Token Usage ===');
+      console.log('Requested questions:', numberOfQuestions);
+      console.log('Max tokens allowed:', Math.min(estimatedTokensNeeded, 16000));
+      console.log('Prompt tokens:', completion.usage?.prompt_tokens);
+      console.log('Completion(output) tokens:', completion.usage?.completion_tokens);
+      console.log('Total tokens:', totalTokensUsed);
+      console.log('Finish reason:', completion.choices[0]?.finish_reason);
+      console.log('==========================');
 
-    // Log how many questions we actually got
-    console.log('Questions received:', questionType === 'mcq' ? result.questions?.length : result.cards?.length);
+      // Extract response
+      const responseContent = completion.choices[0]?.message?.content;
 
-    // Detect truncation - if OpenAI hit token limit and cut off response
-    const finishReason = completion.choices[0]?.finish_reason;
-    if (finishReason === 'length') {
-      console.error('⚠️ Response truncated due to token limit!');
-      const receivedCount = questionType === 'mcq' ? result.questions?.length : result.cards?.length;
-      return NextResponse.json(
-        { 
-          error: `Request exceeded token limit. Received ${receivedCount} of ${numberOfQuestions} questions. Try requesting fewer questions.`,
-          truncated: true,
-          received: receivedCount,
-          requested: numberOfQuestions
-        },
-        { status: 413 } // 413 Payload Too Large
-      );
+      if (!responseContent) {
+        throw new Error("No response from OpenAI");
+      }
+
+      // Parse JSON response
+      try {
+        const parsed = JSON.parse(responseContent);
+
+        if (questionType === 'flashcard') {
+          result = { cards: parsed.cards || parsed };
+        } else {
+          result = { questions: parsed.questions || parsed }; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
+        }
+      } catch (parseError) {
+        console.error("JSON Parse Error Details:", parseError);
+        throw new Error("Invalid response format from OpenAI");
+      }
+      // Log how many questions we actually got
+      console.log('Questions received:', questionType === 'mcq' ? result.questions?.length : result.cards?.length);
+
+      // Detect truncation
+      const finishReason = completion.choices[0]?.finish_reason;
+      const completionTokens = completion.usage?.completion_tokens || 0;
+      
+      if (finishReason === 'length') {
+        console.error('Response truncated due to token limit!');
+        const receivedCount = questionType === 'mcq' ? result.questions?.length : result.cards?.length;
+        return NextResponse.json(
+          { 
+            error: `Request exceeded token limit. Received ${receivedCount} of ${numberOfQuestions} questions. Try requesting fewer questions.`,
+            truncated: true,
+            received: receivedCount,
+            requested: numberOfQuestions
+          },
+          { status: 413 }
+        );
+      }
+      
+      // Detect suspicious low-token responses
+      if (completionTokens < 100 && numberOfQuestions >= 5) {
+        console.error(`Suspiciously low completion tokens: ${completionTokens}`);
+        return NextResponse.json(
+          { 
+            error: `Failed to generate questions. The image may be too complex or unclear. Try a different image or reduce the number of questions.`,
+          },
+          { status: 422 }
+        );
+      }
     }
 
     // Validate we got questions
@@ -337,7 +514,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           numberOfQuestions: result.questions ? result.questions.length : result.cards ? result.cards.length : 0,
           model: "gpt-4o-mini",
-          tokensUsed: completion.usage?.total_tokens || 0,
+          tokensUsed: totalTokensUsed,
         },
       },
       { status: 200 },

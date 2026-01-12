@@ -111,6 +111,9 @@ const parseFiles = async (files: File[]): Promise<ParsedContent> => {
  */
 const compressAndEncodeImage = async (file: File): Promise<string> => {
   try {
+    console.log(`Compressing image: ${file.name}`);
+    console.log(`   Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+    
     // Read file as data URL
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type });
@@ -160,6 +163,11 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
     // This dramatically reduces file size while maintaining visual quality
     const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
     
+    const compressedSize = compressedBase64.length / 1024 / 1024;
+    console.log(`   New dimensions: ${width}×${height}`);
+    console.log(`   Compressed size: ${compressedSize.toFixed(2)} MB`);
+    console.log(`   Reduction: ${((1 - compressedSize / (file.size / 1024 / 1024)) * 100).toFixed(1)}%`);
+    
     return compressedBase64;
   } catch (error) {
     console.error('Image compression failed:', error);
@@ -172,6 +180,9 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
  */
 const extractImagesFromPDF = async (file: File): Promise<string[]> => {
   try {
+    console.log(`📄 Extracting PDF: ${file.name}`);
+    console.log(`   Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+    
     // Dynamic import - only load pdfjs-dist when actually parsing PDF (client-side only)
     const pdfjsLib = await import('pdfjs-dist');
 
@@ -184,6 +195,13 @@ const extractImagesFromPDF = async (file: File): Promise<string[]> => {
 
     const images: string[] = []; // Will store base64 data URLs for each page (images of the pages). base64 is a string that represents the image in base64 format.
     const pagesToProcess = Math.min(pdf.numPages, MAX_PDF_PAGES); // Limit to MAX_PDF_PAGES to control cost
+    
+    console.log(`   Total pages: ${pdf.numPages}`);
+    if (pdf.numPages > MAX_PDF_PAGES) {
+      console.warn(`   ⚠️  PDF truncated! Using first ${pagesToProcess} of ${pdf.numPages} pages`);
+    } else {
+      console.log(`   Processing: ${pagesToProcess} pages`);
+    }
 
     // Extract text from each page. 
     for (let i = 1; i <= pagesToProcess; i++) {
@@ -215,6 +233,13 @@ const extractImagesFromPDF = async (file: File): Promise<string[]> => {
       const base64 = canvas.toDataURL('image/jpeg', 0.85);
       images.push(base64);
     }
+    
+    // Calculate total size of all page images
+    const totalSizeMB = images.reduce((sum, img) => sum + img.length, 0) / (1024 * 1024);
+    const avgPageSizeMB = totalSizeMB / images.length;
+    console.log(`   Generated ${images.length} page images`);
+    console.log(`   Total compressed size: ${totalSizeMB.toFixed(2)} MB`);
+    console.log(`   Avg per page: ${avgPageSizeMB.toFixed(2)} MB`);
 
     return images;
   } catch (error) {
