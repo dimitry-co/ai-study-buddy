@@ -1,20 +1,76 @@
 # AI Study Buddy
 
-An AI-powered study tool that generates flashcards and multiple-choice questions from your notes. Upload PDFs, paste text, and let Study-Buddy create study materials for you.
+AI Study Buddy is a full-stack study app that turns notes into practice material using AI.
+Upload PDFs/images/text or paste notes, then generate:
+- Multiple-choice questions (with explanations)
+- Flashcards (short-answer, fill-in-the-blank style)
+
+## Demo
+
+Demo GIF:
+
+![AI Study Buddy Demo](docs/images/demo.gif)
 
 ## Features
 
-- **AI Question Generation** - Uses GPT-4o-mini to create study materials from your notes
-- **Multiple Choice Questions** - Test your knowledge with 4-option MCQs and explanations
-- **Simple Flashcards** - Quick recall cards with fill-in-the-blank style questions
-- **File Upload** - Supports PDF and TXT file uploads
-- **Anki Export** - Download your cards as text files to import into Anki for spaced repitition
-- **Score Tracking** - See how you're doing with instant feedback
+- AI-powered MCQ and flashcard generation (`gpt-4o-mini`)
+- Text and file input (PDF, images, TXT/MD)
+- Free-trial gating + subscription access control
+- Stripe checkout + webhook-driven subscription sync
+- Anki export (`.txt`) and PDF export options
+- Score tracking and answer reveal for MCQ practice
 
 ## Tech Stack
-- **Frontend**: Next.js 15, React, Tailwind CSS
-- **Backend**: Next.js API Routes
-- **AI**: OpenAI GPT-4o-mini
-- **Auth**: Supabase Authentication
-- **Payments**: Stripe Subscriptions
-- **Database**: Supabase (PostgreSQL)
+
+- Frontend: Next.js 16, React 19, Tailwind CSS 4
+- Backend: Next.js App Router API routes
+- AI: OpenAI API
+- Auth + DB: Supabase
+- Billing: Stripe subscriptions
+- Testing: Jest + React Testing Library
+
+## Project Docs
+
+- Architecture deep dive: [ARCHITECTURE.md](ARCHITECTURE.md)
+
+## Quick Start
+
+### 1. Install dependencies
+
+```bash
+npm ci
+```
+
+### 2. Configure environment variables
+
+Create `.env.local` with:
+
+```bash
+OPENAI_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_PRICE_ID=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+### 3. Run locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Testing
+
+```bash
+npm test
+```
+
+## Notes
+
+- Keep operational limits centralized in `src/lib/constants.ts`.
+- Route-level request flow and guardrails are documented in `ARCHITECTURE.md`.
