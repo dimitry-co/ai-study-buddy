@@ -7,8 +7,6 @@ Upload PDFs/images/text or paste notes, then generate:
 
 ## Demo
 
-Demo GIF:
-
 ![AI Study Buddy Demo](docs/images/demo.gif)
 
 ## Features
