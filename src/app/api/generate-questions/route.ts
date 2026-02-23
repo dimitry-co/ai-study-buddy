@@ -14,12 +14,10 @@ import {
   buildFlashCardVisionPromptWithText,
 } from '@/lib/prompts';
 
-// Initialize OpenAI client with API key from env variables
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Helper: Build Vision API content array
 const buildVisionContent = (images: string[], textPrompt: string): any[] => {
   const content: any[] = [
     { type: 'text', text: textPrompt }
@@ -29,8 +27,8 @@ const buildVisionContent = (images: string[], textPrompt: string): any[] => {
     content.push({
       type: 'image_url',
       image_url: {
-        url: image, // Already has "data:image/...;base64,..." format from fileParser
-        detail: 'high' // high detail for better OCR (OCR = Optical Character Recognition. this helps with text recognition)
+        url: image,
+        detail: 'high'
       }
     });
   }
@@ -38,24 +36,18 @@ const buildVisionContent = (images: string[], textPrompt: string): any[] => {
   return content;
 }
 
-// POST handler - receives and logs the notes (for now)
 export async function POST(request: NextRequest) {
-
-  // Get Next.js cookies (browser sent auth cookies with request)
   const cookieStore = await cookies();
 
-  // Create Supabase server-side client (can READ auth cookies/ has access to request cookies)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // Tell supabase HOW to read cookies from Next.js (this function called by supabase to read all cookies from request)
         getAll() {
-          return cookieStore.getAll(); // Provide this function to supabase (Gets all cookies from request)
+          return cookieStore.getAll();
         },
-        // Tell supabase HOW to write new cookies (if needed)
-        setAll(cookiesToSet) {      // This function called by supabase to set all cookies in response
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
           });
@@ -64,35 +56,30 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  // Check if user is logged in (has auth cookie)
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   if (!user || authError) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check if admin
-  const isAdmin = ADMIN_EMAILS.includes(user.email!); // '!' means we know user.email is not null (because we checked for authError above)
+  const isAdmin = ADMIN_EMAILS.includes(user.email!);
   let isSubscribed = false;
   let freeUsed = 0;
 
   if (!isAdmin) {
-    // Check subscription in database
     const { data: subscription } = await supabase
       .from('subscriptions')
       .select('status, current_period_end')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })  // order where the lastest subscription record is first
-      .limit(1)                                   // get only the lastest subscription record
-      .single();                                  // return as single object (not an array)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    // Check if active and not expired (is subscribed). (!! converts any value to boolean so null -> false)
     isSubscribed = !!(subscription && 
       (subscription.status === 'active' || subscription.status === 'canceled') &&
       new Date(subscription.current_period_end) > new Date());
 
     if (!isSubscribed) {
-      // Check free tier limit
       const { data: profile } = await supabase
         .from('profiles')
         .select('free_generations_used')
@@ -113,14 +100,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { 
-      contentType,       // 'text' or 'images'
-      notes,             // text content (if content type === 'text)
-      images,            // base64 images array (if content type === 'images')
+      contentType,
+      notes,
+      images,
       numberOfQuestions = 30, 
       questionType = 'mcq'
     } = body;
 
-    // Validate numberOfQuestions (backend validation - never trust client input)
     if (numberOfQuestions < MIN_QUESTIONS || numberOfQuestions > MAX_QUESTIONS) {
       return NextResponse.json(
         { error: `Number of questions must be between ${MIN_QUESTIONS} and ${MAX_QUESTIONS}` },
@@ -128,7 +114,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate input - need either text or images
     if (contentType === 'text' && (!notes || notes.trim().length === 0)) {
       return NextResponse.json(
         { error: "Notes are required" },
@@ -142,9 +127,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Validate total image count after parsing (prevent token overload)
-    // This includes both direct image uploads and PDF pages
-    // Each image can use 15K-40K tokens depending on size/complexity
+    // Guard Vision requests against runaway token usage.
     if (contentType === 'images' && images.length > MAX_IMAGES) {
       return NextResponse.json(
         { error: `Too many images. Maximum ${MAX_IMAGES} total images allowed (from PDFs and image files combined). Try uploading fewer files or reducing PDF page count.` },
@@ -160,10 +143,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set system prompt (same for all paths)
     const systemPrompt = questionType === 'mcq' ? mcqSystemPrompt : flashCardSystemPrompt;
 
-    // Decide whether to use batching or single request
     let result;
     let totalTokensUsed = 0;
     
@@ -171,7 +152,6 @@ export async function POST(request: NextRequest) {
       // ===== BATCHING MODE (10+ questions) =====
       console.log(`Using batching: ${numberOfQuestions} questions split into ${NUM_BATCHES} batches`);
       
-      // Warn if using many images (could cause token limit issues in batching)
       if (contentType === 'images' && images && images.length > 10) {
         console.warn(`Large image count (${images.length} images). Performance may be slower.`);
       }
@@ -195,48 +175,45 @@ export async function POST(request: NextRequest) {
           if (contentType === 'images') {
             const promptText = 
               notes && notes.trim().length > 0
-                ? buildMCQVisionPromptWithText(questionsInThisBatch, notes)  // Use batch count!
-                : buildMCQVisionPrompt(questionsInThisBatch);                 // Use batch count!
+                ? buildMCQVisionPromptWithText(questionsInThisBatch, notes)
+                : buildMCQVisionPrompt(questionsInThisBatch);
             batchUserContent = buildVisionContent(images, promptText);
           } else {
-            batchUserContent = buildMCQUserPrompt(notes, questionsInThisBatch); // Use batch count!
+            batchUserContent = buildMCQUserPrompt(notes, questionsInThisBatch);
           }
         } else { // flashcard
           if (contentType === 'images') {
             const promptText =
               notes && notes.trim().length > 0
-                ? buildFlashCardVisionPromptWithText(questionsInThisBatch, notes)  // Use batch count!
-                : buildFlashCardVisionPrompt(questionsInThisBatch);                 // Use batch count!
+                ? buildFlashCardVisionPromptWithText(questionsInThisBatch, notes)
+                : buildFlashCardVisionPrompt(questionsInThisBatch);
             batchUserContent = buildVisionContent(images, promptText);
           } else {
-            batchUserContent = buildFlashCardUserPrompt(notes, questionsInThisBatch); // Use batch count!
+            batchUserContent = buildFlashCardUserPrompt(notes, questionsInThisBatch);
           }
         }
         
-        // Calculate max tokens for this batch with larger buffer for complex content
+        // Keep a larger output budget for vision-heavy requests.
         const estimatedTokensNeeded = questionType === 'mcq' 
-          ? questionsInThisBatch * 250 + 1000  // Increased buffer for complex PDFs
+          ? questionsInThisBatch * 250 + 1000
           : questionsInThisBatch * 120 + 600;
         
         console.log(`  Batch ${i + 1} (${batchFocus.name}): ${questionsInThisBatch} questions, max_tokens: ${Math.min(estimatedTokensNeeded, 16000)}`);
         
-        // Make OpenAI API call with batch-specific prompt
         return openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             { role: "system", content: batchSystemPrompt },
-            { role: "user", content: batchUserContent }, // Batch-specific prompt!
+            { role: "user", content: batchUserContent },
           ],
-          temperature: 0.8, // Higher temp for more diversity
+          temperature: 0.8,
           max_tokens: Math.min(estimatedTokensNeeded, 16000),
           response_format: { type: "json_object" },
         });
       });
       
-      // Wait for all batches to complete in parallel
       const batchResults = await Promise.all(batchPromises);
       
-      // Combine results from all batches
       const allQuestions: any[] = [];
       let totalPromptTokens = 0;
       let totalCompletionTokens = 0;
@@ -245,9 +222,8 @@ export async function POST(request: NextRequest) {
         const completion = batchResults[i];
         const finishReason = completion.choices[0]?.finish_reason;
         const batchCompletionTokens = completion.usage?.completion_tokens || 0;
-        const responseContent = completion.choices[0]?.message?.content; // Extract the response content from the completion
+        const responseContent = completion.choices[0]?.message?.content;
         
-        // Check for truncation in this batch
         if (finishReason === 'length') {
           console.error(`Batch ${i + 1} truncated! Finish reason: length`);
           return NextResponse.json(
@@ -258,7 +234,6 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // Check for suspiciously low tokens in this batch
         if (batchCompletionTokens < 50) {
           console.error(`Batch ${i + 1} returned suspiciously low tokens: ${batchCompletionTokens}`);
           return NextResponse.json(
@@ -273,14 +248,13 @@ export async function POST(request: NextRequest) {
           throw new Error(`Batch ${i + 1} returned no response`);
         }
         
-        // Parse this batch's results
         try {
           const parsed = JSON.parse(responseContent);
           const batchQuestions = questionType === 'mcq' 
             ? (parsed.questions || parsed)
             : (parsed.cards || parsed);
           
-          // Renumber IDs to be sequential across all batches
+          // Ensure IDs are sequential after merging batch outputs.
           const renumbered = batchQuestions.map((q: any, idx: number) => ({
             ...q,
             id: allQuestions.length + idx + 1
@@ -298,12 +272,10 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // Accumulate token usage
         totalPromptTokens += completion.usage?.prompt_tokens || 0;
         totalCompletionTokens += batchCompletionTokens;
       }
       
-      // Log combined token usage
       totalTokensUsed = totalPromptTokens + totalCompletionTokens;
       console.log('=== Batched OpenAI Token Usage ===');
       console.log('Requested questions:', numberOfQuestions);
@@ -314,10 +286,8 @@ export async function POST(request: NextRequest) {
       console.log('Questions received:', allQuestions.length);
       console.log('==================================');
       
-      // Trim to exact number requested (in case we got extras)
       const trimmedQuestions = allQuestions.slice(0, numberOfQuestions);
       
-      // Set result based on question type
       if (questionType === 'mcq') {
         result = { questions: trimmedQuestions };
       } else {
@@ -328,7 +298,6 @@ export async function POST(request: NextRequest) {
       // ===== SINGLE REQUEST MODE (<10 questions) =====
       console.log(`📝 Using single request: ${numberOfQuestions} questions`);
       
-      // Build prompts for single request (batching builds its own)
       let userContent: any;
       if (questionType === 'mcq') {
         if (contentType === 'images') {
@@ -352,10 +321,9 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // max_tokens scales with number of questions to prevent response cutoff
       const estimatedTokensNeeded = questionType === 'mcq' 
-        ? numberOfQuestions * 200 + 500  // MCQ: ~200 tokens each + buffer
-        : numberOfQuestions * 100 + 500; // Flashcard: ~100 tokens each + buffer
+        ? numberOfQuestions * 200 + 500
+        : numberOfQuestions * 100 + 500;
       
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -368,7 +336,6 @@ export async function POST(request: NextRequest) {
         response_format: { type: "json_object" },
       });
       
-      // Log token usage
       totalTokensUsed = completion.usage?.total_tokens || 0;
       console.log('=== OpenAI Token Usage ===');
       console.log('Requested questions:', numberOfQuestions);
@@ -379,30 +346,26 @@ export async function POST(request: NextRequest) {
       console.log('Finish reason:', completion.choices[0]?.finish_reason);
       console.log('==========================');
 
-      // Extract response
       const responseContent = completion.choices[0]?.message?.content;
 
       if (!responseContent) {
         throw new Error("No response from OpenAI");
       }
 
-      // Parse JSON response
       try {
         const parsed = JSON.parse(responseContent);
 
         if (questionType === 'flashcard') {
           result = { cards: parsed.cards || parsed };
         } else {
-          result = { questions: parsed.questions || parsed }; // Handle different possible response structures - Try to get questions from wrapper object, fallback to array if not found
+          result = { questions: parsed.questions || parsed };
         }
       } catch (parseError) {
         console.error("JSON Parse Error Details:", parseError);
         throw new Error("Invalid response format from OpenAI");
       }
-      // Log how many questions we actually got
       console.log('Questions received:', questionType === 'mcq' ? result.questions?.length : result.cards?.length);
 
-      // Detect truncation
       const finishReason = completion.choices[0]?.finish_reason;
       const completionTokens = completion.usage?.completion_tokens || 0;
       
@@ -420,7 +383,6 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // Detect suspicious low-token responses
       if (completionTokens < 100 && numberOfQuestions >= 5) {
         console.error(`Suspiciously low completion tokens: ${completionTokens}`);
         return NextResponse.json(
@@ -432,22 +394,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate we got questions
     if (questionType === 'mcq') {
       if (result.questions.length === 0) {
         throw new Error("OpenAI returned no questions");
       }
 
-      // Validate each question structure
       for (let i = 0; i < result.questions.length; i++) {
         const q = result.questions[i];
 
-        // check all required fields exist
         if (!q.id || !q.question || !q.options || !q.correctAnswer || !q.explanation) {
           throw new Error("Invalid question structure from OpenAI");
         }
 
-        // Check types
         if (typeof q.id !== "number") {
           throw new Error(`Question ${i + 1}: id must be a number`);
         }
@@ -468,22 +426,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Validate cards
     if (questionType === 'flashcard') {
       if (result.cards.length === 0) {
         throw new Error("OpenAI returned no cards");;
       }
 
-      // Validate each card structure
       for (let i = 0; i < result.cards.length; i++) {
         const c = result.cards[i];
 
-        // Check all required field exist
         if (!c.id || !c.question || !c.answer) {
           throw new Error("Invalid card structure from OpenAI");
         }
 
-        // Check Types
         if (typeof c.id !== "number") {
           throw new Error(`Card ${i + 1}: id must be a number`);
         }
@@ -499,7 +453,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Increment free generations used (only for free tier)
     if (!isAdmin && !isSubscribed) {
       await supabase
         .from('profiles')
@@ -507,7 +460,6 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
     }
 
-    // Return the questions to the frontend
     return NextResponse.json(
       {
         ...result,
@@ -520,15 +472,12 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error: any) {
-    // Log detailed error for YOU (server console)
     console.error("Error generating questions:", error);
 
-    // OpenAI thew this (bad API key)
     if (error?.status === 401) {
       return NextResponse.json({ error: "Invalid API key" }, { status: 500 });
     }
 
-    // OpenAI thow this (rate limit exceeded)
     if (error?.status === 429) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again later." },
@@ -536,7 +485,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generic error response
     return NextResponse.json(
       { error: "Failed to generate questions. Please try again." },
       { status: 500 },
@@ -544,11 +492,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET handler for health check and Supabase keep-alive
 export async function GET() {
   try {
-    // Create Supabase client to ping Supabase and keep it active
-    // This doesn't require auth - just establishes a connection
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -558,21 +503,16 @@ export async function GET() {
             return [];
           },
           setAll() {
-            // No-op for keep-alive
           },
         },
       }
     );
 
-    // Simple query to ping Supabase and keep it active
-    // This is a lightweight query that doesn't require auth
     const { error } = await supabase
       .from('profiles')
       .select('id')
       .limit(1);
 
-    // Even if it errors (no auth), the connection attempt keeps Supabase active
-    // The query itself doesn't matter - just pinging Supabase keeps it active
     return NextResponse.json({
       status: "Api route is working",
       endpoint: "/api/generate-questions",
@@ -581,7 +521,6 @@ export async function GET() {
       supabase: "keep-alive pinged",
     });
   } catch (error) {
-    // Even if there's an error, Supabase was pinged, which is what we want
     return NextResponse.json({
       status: "Api route is working",
       endpoint: "/api/generate-questions",

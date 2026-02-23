@@ -16,12 +16,12 @@ import { ParsedContent } from '@/lib/fileParser';
 export default function Home() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true); // Loading state for auth checks
+  const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
   const [numberOfQuestions, setNumberOfQuestions] = useState(25);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [flashcards, setFlashcards] = useState<FlashCard[]>([]);
-  const [loading, setLoading] = useState(false);  // Loading state for question generation
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [questionType, setQuestionType] = useState<'mcq' | 'flashcard'>('mcq');
   const [isFreeTier, setIsFreeTier] = useState(false);
@@ -34,13 +34,11 @@ export default function Home() {
         const { user, error } = await getCurrentUser();
         console.log('1. User:', user?.email);
 
-        // Not logged in - redirect to login if not logged in
         if (!user || error) {
           router.push('/login');
           return;
         }
 
-        // check if user has access to generate questions
         const canAccess = await hasAccessToGenerate(user.id, user.email!);
         console.log('2. canAccess:', canAccess);
 
@@ -63,18 +61,16 @@ export default function Home() {
           return;
         }
 
-        // Not admin, not subscribed -> free tier (check how many generations left)
         const freeUsed = await getFreeGenerationsUsed(user.id);
         console.log('5. freeUsed:', freeUsed);
 
-        // User is on free tier with generations left
         setIsFreeTier(true);
         setFreeGenerationsLeft(FREE_GENERATION_LIMIT - freeUsed);
         console.log('6. freeGenerationsLeft:', freeGenerationsLeft);
 
       } catch (error) {
         console.error('Auth check failed:', error);
-        setAuthError('Connection error. Please try again.'); // Network errors
+        setAuthError('Connection error. Please try again.');
       } finally {
         setAuthLoading(false);
       }
@@ -82,7 +78,6 @@ export default function Home() {
     checkAuth();
   }, [router]);
 
-  // Download Anki Deck
   const handleDownloadAnki = () => {
     let tsvContent = "";
     let fileName = "";
@@ -105,7 +100,6 @@ export default function Home() {
   };
 
   const generateQuestions = async (content: ParsedContent) => {
-    // Clear previous state (errors, questions)
     setError("");
     setQuestions([]);
     setFlashcards([]);
@@ -118,31 +112,30 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contentType: content.type,     // 'text' or 'images'
-          notes: content.text,           // text content (if text type)
-          images: content.images,        // text content (if text type)
+          contentType: content.type,
+          notes: content.text,
+          images: content.images,
           numberOfQuestions,
           questionType,
         }),
       });
 
-      // Handle specific error status codes BEFORE parsing JSON
       if (response.status === 413) {
         setError("Files are too large. Try uploading fewer files or reducing image quality.");
         return;
       }
 
-      const data = await response.json(); // We don't receive all the data at once, we receive it in chunks. so we need to wait for the data to be fully received. this line uses await, receives the data and parses it into a JavaScript object.
+      const data = await response.json();
 
       if (response.ok) {
         if (questionType === 'flashcard') {
           setFlashcards(data.cards || []);
           setQuestions([]);
-        } else { // MCQ
+        } else {
           setQuestions(data.questions || []);
           setFlashcards([]);
         }
-        setGenerationId(prev => prev + 1); // Increment generationId to trigger reset of state in child components (QuestionsDisplay and FlashCardsDisplay)
+        setGenerationId(prev => prev + 1);
 
         if (isFreeTier) {
           setFreeGenerationsLeft(prev => {
@@ -153,7 +146,6 @@ export default function Home() {
         setError(data.error || "Failed to generate questions");
       }
     } catch (error: any) {
-      // Catch network errors (request too large to send, CORS, etc.)
       console.error("Fetch error:", error);
       if (error.name === 'AbortError') {
         setError("Request timed out. The server may be starting up. Please try again.");
@@ -167,7 +159,6 @@ export default function Home() {
     }
   };
 
-  // Loading state for authentication 
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -176,7 +167,6 @@ export default function Home() {
     );
   }
 
-  //Error state if network failed (with retry option)
   if (authError && !isAuthorized) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -193,7 +183,6 @@ export default function Home() {
     );
   }
 
-  // Redirect to login if not authorized
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -205,7 +194,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-900/70 p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <Header onSignOut={handleSignout} />
 
         {isFreeTier && freeGenerationsLeft > 0 && (
@@ -216,7 +204,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Input Sections */}
         <InputSection
           numberOfQuestions={numberOfQuestions}
           setNumberOfQuestions={setNumberOfQuestions}
@@ -228,7 +215,6 @@ export default function Home() {
           setError={setError}
         />
 
-        {/* Error Display */}
         {error && (
           <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-8">
             <p className="font-medium">Error:</p>
@@ -236,7 +222,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Questions Display */}
         {questions.length > 0 && (
           <QuestionsDisplay
             questions={questions}
@@ -245,7 +230,6 @@ export default function Home() {
           />
         )}
 
-        {/* Flash Cards Display  */}
         {flashcards.length > 0 && (
           <FlashCardsDisplay 
             flashcards={flashcards}

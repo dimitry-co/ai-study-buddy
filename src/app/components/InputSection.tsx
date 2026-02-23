@@ -19,32 +19,26 @@ const InputSection = (props: InputSectionProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [questionInput, setQuestionInput] = useState<string>(String(props.numberOfQuestions));
 
-  // Keep local input in sync if parent changes the number (e.g., clamped)
   useEffect(() => {
     setQuestionInput(String(props.numberOfQuestions));
   }, [props.numberOfQuestions]);
 
-  // Handle the generate button click - prepare content for the API call and send up to parent for processing.
   const handleGenerateClick = async () => {
-    // Handle text mode input
     if (inputMode === 'text') {
       if (!notes.trim()) {
         props.setError("Please enter some notes");
         return;
       }
-      // Text mode - send tas textt type and text to parent for processing.
       props.onGenerate({ type: 'text', text: notes });
       return;
     }
 
-    // Handle file mode input
     if (inputMode === 'file') {
       if (selectedFiles.length === 0) {
         props.setError("Please select at least one file");
         return;
       }
 
-      // 1. Validate all files
       for (const file of selectedFiles) {
         const validation = validateFile(file);
         if (!validation.valid) {
@@ -53,7 +47,6 @@ const InputSection = (props: InputSectionProps) => {
         }
       }
       
-      // 2. Check image file count (before parsing, PDFs excluded)
       const imageFiles = selectedFiles.filter(f => 
         f.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name)
       );
@@ -62,11 +55,10 @@ const InputSection = (props: InputSectionProps) => {
         return;
       }
       
-      // 3. Parse all files (extract text or convert to images)
       try {
         props.setLoading(true);
         const parsedContent = await parseFiles(selectedFiles);
-        props.onGenerate(parsedContent); // send content to parent for processing.
+        props.onGenerate(parsedContent);
       } catch (err: any) {
         props.setError(err.message || "Failed to parse files.");
         props.setLoading(false);
@@ -84,7 +76,6 @@ const InputSection = (props: InputSectionProps) => {
           Upload Notes (PDF, Images, or Text)
         </label>
 
-        {/* Input Method Selection Buttons */}
         <div className="flex gap-4 mb-6">
           <button
             onClick={() => setInputMode('file')}
@@ -98,7 +89,7 @@ const InputSection = (props: InputSectionProps) => {
           <button
             onClick={() => {
               setInputMode('text');
-              setSelectedFiles([]); // Clear files when switching to text mode
+              setSelectedFiles([]);
             }}
             className={`flex-1 py-3 px-6 rounded-3xl font-semibold transition-all cursor-pointer ${inputMode === 'text'
               ? 'bg-white text-gray-900'
@@ -109,7 +100,6 @@ const InputSection = (props: InputSectionProps) => {
           </button>
         </div>
 
-        {/* Conditionally render input based on mode */}
         {inputMode === 'text' && (
           <textarea
             id="notes"
@@ -182,7 +172,6 @@ const InputSection = (props: InputSectionProps) => {
           </label>
         )}
         
-        {/* File Upload Limits Info */}
         {inputMode === 'file' && (
           <div className="mt-4 bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
             <p className="text-blue-300 text-sm font-medium mb-1">Upload Limits:</p>
@@ -196,7 +185,6 @@ const InputSection = (props: InputSectionProps) => {
         )}
       </div>
 
-      {/* Number of Question Selector */}
       <div className="mb-6">
         <label
           htmlFor="numQuestions"
@@ -209,11 +197,9 @@ const InputSection = (props: InputSectionProps) => {
           type="number"
           value={questionInput}
           onChange={(e) => {
-            // Let the user type freely (including clearing the field)
             setQuestionInput(e.target.value);
           }}
           onBlur={() => {
-            // Clamp to valid range on blur
             const parsed = parseInt(questionInput);
             const clamped = Math.min(
               Math.max(isNaN(parsed) ? MIN_QUESTIONS : parsed, MIN_QUESTIONS),
@@ -226,7 +212,6 @@ const InputSection = (props: InputSectionProps) => {
         />
       </div>
 
-      {/* Question Type Selector */}
       <div className="mb-6">
         <label
           htmlFor="questionType"
@@ -259,9 +244,3 @@ const InputSection = (props: InputSectionProps) => {
 };
 
 export default InputSection;
-
-
-// Questions
-// 1 - explain the classnames css for the uploaded file user wants to genreate questions with. 
-//     Also the svg icons used for the remove button.
-// 2 - explain disabled logic on generate button.

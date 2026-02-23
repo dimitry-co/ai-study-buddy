@@ -14,11 +14,10 @@ import {
   MAX_FILES
 } from '@/lib/constants';
 
-// Return type for parsed content
 interface ParsedContent {
   type: 'text' | 'images';
   text?: string;
-  images?: string[]; // based64 data URLS
+  images?: string[];
 }
 
 /**
@@ -29,27 +28,23 @@ const parseFile = async (file: File): Promise<ParsedContent> => {
     const fileType = file.type;
     const fileName = file.name.toLowerCase();
 
-    // IMAGE FILES -> compress and convert to base64 images (same compression as PDFs)
     if (SUPPORTED_IMAGE_TYPES.includes(fileType) || /\.(jpg|jpeg|png|gif|webp)$/.test(fileName)) {
-      const base64 = await compressAndEncodeImage(file); // Compress before encoding
-      return { type: 'images', images: [base64] }; // return object with type and base64 image
+      const base64 = await compressAndEncodeImage(file);
+      return { type: 'images', images: [base64] };
     }
 
-    // PDF FILES -> render pages as images
     if (SUPPORTED_PDF_TYPES.includes(fileType) || fileName.endsWith('.pdf')) {
       const images = await extractImagesFromPDF(file);
       return { type: 'images', images };
     }
 
-    // TEXT FILES → extract text
     if (SUPPORTED_TEXT_TYPES.includes(fileType) || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
       const text = await file.text();
-      return { type: 'text', text }; // return object with type and text
+      return { type: 'text', text };
     }
 
     throw new Error('Unsupported file type.');
   } catch (error: any) {
-    // Re-throw with specific message if available, otherwise generic
     console.error('File parsing failed:', error);
     throw new Error(error.message || 'Failed to process file. Please try a different file.');
   }
@@ -70,11 +65,9 @@ const parseFiles = async (files: File[]): Promise<ParsedContent> => {
   const allImages: string[] = [];
   const allTexts: string[] = [];
 
-  // Process each file
   for (const file of files) {
     const parsed = await parseFile(file);
 
-    // Collect all images (from PDFs and images)
     if (parsed.type === 'images' && parsed.images) {
       allImages.push(...parsed.images);
     }
@@ -83,21 +76,17 @@ const parseFiles = async (files: File[]): Promise<ParsedContent> => {
     }
   }
 
-
-  // If we have images (even if we also have text), use Vision API
-  // The text will be included in the prompr along with images
   if (allImages.length > 0) {
     const combinedText = allTexts.length > 0 
-      ? allTexts.join('\n\n---\n\n') // Join multiple text files with separator
+      ? allTexts.join('\n\n---\n\n')
       : undefined;
     return {
       type: 'images',
       images: allImages,
-      text: combinedText // Include text if available
+      text: combinedText
     }
   }
 
-  // Only text files = combine and return as text type
   if (allTexts.length > 0) {
     return { type: 'text', text: allTexts.join('\n\n---\n\n')}
   }
@@ -114,7 +103,6 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
     console.log(`Compressing image: ${file.name}`);
     console.log(`   Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
     
-    // Read file as data URL
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type });
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -124,7 +112,6 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
       reader.readAsDataURL(blob);
     });
 
-    // Load image to get dimensions
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
@@ -132,12 +119,10 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
       image.src = dataUrl;
     });
 
-    // Calculate new dimensions (max 1920px on longest side, same as PDF compression logic)
     const MAX_DIMENSION = 1920;
     let width = img.width;
     let height = img.height;
 
-    // Calculate new dimensions based on longest side and maintain aspect ratio
     if (width > height && width > MAX_DIMENSION) {
       height = Math.round((height / width) * MAX_DIMENSION);
       width = MAX_DIMENSION;
@@ -146,21 +131,18 @@ const compressAndEncodeImage = async (file: File): Promise<string> => {
       height = MAX_DIMENSION;
     }
 
-    // Create canvas and draw resized image
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     
-    const context = canvas.getContext('2d'); // like the paintbrush tool
+    const context = canvas.getContext('2d');
     if (!context) {
       throw new Error('Failed to create canvas context');
     }
 
-    // Draw image to canvas (resizes it)
     context.drawImage(img, 0, 0, width, height);
 
-    // Convert to JPEG at 85% quality (same as PDF processing)
-    // This dramatically reduces file size while maintaining visual quality
+    // 0.85 keeps text readable while reducing payload size.
     const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
     
     const compressedSize = compressedBase64.length / 1024 / 1024;
@@ -183,18 +165,16 @@ const extractImagesFromPDF = async (file: File): Promise<string[]> => {
     console.log(`📄 Extracting PDF: ${file.name}`);
     console.log(`   Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
     
-    // Dynamic import - only load pdfjs-dist when actually parsing PDF (client-side only)
     const pdfjsLib = await import('pdfjs-dist');
 
-    // Set up the worker 
     pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-    const arrayBuffer = await file.arrayBuffer(); // Convert file to array buffer (binary data)
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer }); // Create a loading task to load the PDF document
-    const pdf = await loadingTask.promise; // Wait for the loading task to complete and get the PDF document
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
 
-    const images: string[] = []; // Will store base64 data URLs for each page (images of the pages). base64 is a string that represents the image in base64 format.
-    const pagesToProcess = Math.min(pdf.numPages, MAX_PDF_PAGES); // Limit to MAX_PDF_PAGES to control cost
+    const images: string[] = [];
+    const pagesToProcess = Math.min(pdf.numPages, MAX_PDF_PAGES);
     
     console.log(`   Total pages: ${pdf.numPages}`);
     if (pdf.numPages > MAX_PDF_PAGES) {
@@ -203,17 +183,14 @@ const extractImagesFromPDF = async (file: File): Promise<string[]> => {
       console.log(`   Processing: ${pagesToProcess} pages`);
     }
 
-    // Extract text from each page. 
     for (let i = 1; i <= pagesToProcess; i++) {
       const page = await pdf.getPage(i);
 
-      // Scale the page to 1.5x its original size to improve OCR accuracy (OCR = Optical Character Recognition. this helps with text recognition)
       const scale = 1.5;
-      const viewport = page.getViewport({ scale }); // Get the viewport (the visible area of the page)
+      const viewport = page.getViewport({ scale });
 
-      // Create a canvas to render the page (A canvas is a HTML element that can be used to draw graphics on the screen.)
       const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d'); // Get the context (the object that allows you to draw on the canvas. its part of the canvas object. its a 2D context. it allows you to draw shapes, text, images, etc. on the canvas.)
+      const context = canvas.getContext('2d');
 
       if (!context) {
         throw new Error('Failed to create canvas context.');
@@ -222,19 +199,16 @@ const extractImagesFromPDF = async (file: File): Promise<string[]> => {
       canvas.width = viewport.width;
       canvas.height = viewport.height;
 
-      // Render page to canvas
       await page.render({
         canvasContext: context,
         viewport: viewport,
         canvas: canvas,
       }).promise;
 
-      // Convert canvas to base64 JPEG (smaller than PNG), because its requires by OpenAI API and for text-safety. You can't send binary data in JSON. ex: String.fromCharCode(10)  // '\n' (newline) - can break JSON
       const base64 = canvas.toDataURL('image/jpeg', 0.85);
       images.push(base64);
     }
     
-    // Calculate total size of all page images
     const totalSizeMB = images.reduce((sum, img) => sum + img.length, 0) / (1024 * 1024);
     const avgPageSizeMB = totalSizeMB / images.length;
     console.log(`   Generated ${images.length} page images`);
@@ -258,7 +232,6 @@ const validateFile = (file: File): { valid: boolean; error?: string } => {
     return { valid: false, error: `File size must be less than ${MAX_FILE_SIZE_MB}MB` };
   }
 
-  // check file type
   const isValidType =
     SUPPORTED_IMAGE_TYPES.includes(file.type) ||
     SUPPORTED_TEXT_TYPES.includes(file.type) ||
